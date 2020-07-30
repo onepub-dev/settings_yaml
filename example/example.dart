@@ -1,10 +1,11 @@
+import 'package:simpleyaml/simpleyaml.dart';
 
+void main() {
+  save();
 
-Provide a very simple method to use yaml files for saving an apps configuration.
+  load();
+}
 
-Saving config data:
-
-```dart
 void save() {
   var settings = SimpleYaml(filePath: '.settings.yaml');
 
@@ -14,11 +15,7 @@ void save() {
 
   settings.save();
 }
-```
 
-Loading config data.
-
-```dart
 void load() {
   var settings = SimpleYaml.load(filePath: '.settings.yaml');
 
@@ -28,5 +25,3 @@ void load() {
 
   print('dbname $dbname, username: $username, password: $password');
 }
-```
-

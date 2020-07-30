@@ -9,7 +9,7 @@ class SimpleYaml {
   String filePath;
   var valueMap = <String, dynamic>{};
 
-  SimpleYaml(this.filePath);
+  SimpleYaml({@required this.filePath});
 
   SimpleYaml.fromString({@required String contents, @required this.filePath}) {
     _document = loadYamlDocument(contents);
