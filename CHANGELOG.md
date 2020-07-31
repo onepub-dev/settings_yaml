@@ -1,3 +1,6 @@
+# 1.0.2
+load was failig to create the file if create was true.
+
 # 1.0.1
 Added examples.
 Change the ctor to take a named arg for consistency.
