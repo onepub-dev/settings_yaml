@@ -12,6 +12,9 @@ class SimpleYaml {
   SimpleYaml({@required this.filePath});
 
   SimpleYaml.fromString({@required String contents, @required this.filePath}) {
+    /// don't try to load an empty settings file. It will end in tears.
+    if (contents == null || contents.trim().isEmpty) return;
+
     _document = loadYamlDocument(contents);
 
     var topMap = _document.contents as YamlMap;

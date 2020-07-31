@@ -53,4 +53,41 @@ port: 10
     expect(yaml['hostname'], equals('slayer'));
     expect(yaml['port'], equals(10));
   });
+
+  test('SimpleYaml load create with no file.', () async {
+    var path = '/tmp/settings.yaml';
+
+    if (exists(path)) {
+      delete(path);
+    }
+
+    var yaml = SimpleYaml.load(filePath: path, create: true);
+    yaml.save();
+  });
+
+  test('SimpleYaml load create with no file and save settings.', () async {
+    var path = '/tmp/settings.yaml';
+
+    if (exists(path)) {
+      delete(path);
+    }
+
+    var yaml = SimpleYaml.load(filePath: path, create: true);
+
+    yaml['name'] = 'brett';
+    yaml['hostname'] = 'slayer';
+    yaml['port'] = 10;
+
+    expect(yaml['name'], equals('brett'));
+    expect(yaml['hostname'], equals('slayer'));
+    expect(yaml['port'], equals(10));
+    yaml.save();
+
+    // reload saved data and make certain that its intact.
+    yaml = SimpleYaml.load(filePath: path, create: true);
+
+    expect(yaml['name'], equals('brett'));
+    expect(yaml['hostname'], equals('slayer'));
+    expect(yaml['port'], equals(10));
+  });
 }
