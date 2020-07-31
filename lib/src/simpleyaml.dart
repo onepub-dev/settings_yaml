@@ -22,8 +22,12 @@ class SimpleYaml {
   }
 
   static SimpleYaml load({String filePath, bool create = false}) {
-    if (!create && !exists(filePath)) {
-      throw SimpleYamlException('The yaml file $filePath does not exist');
+    if (!exists(filePath)) {
+      if (create) {
+        touch(filePath, create: true);
+      } else {
+        throw SimpleYamlException('The yaml file $filePath does not exist');
+      }
     }
 
     var contents = File(filePath).readAsStringSync();
