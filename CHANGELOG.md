@@ -1,3 +1,6 @@
+# 1.0.3
+added logic to handle loading an empty settings file.
+
 # 1.0.2
 load was failig to create the file if create was true.
 
