@@ -1,5 +1,15 @@
 
 
+
+***************************************************
+
+NOTE: this project has been renamed to settings_yaml.
+
+Please see the for the latest version.
+
+
+*************************************
+
 Provide a very simple method to use yaml files for saving an apps configuration.
 
 Saving config data:

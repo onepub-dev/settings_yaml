@@ -1,3 +1,6 @@
+# 1.0.4
+Moved project to settings_yaml.
+
 # 1.0.3
 added logic to handle loading an empty settings file.
 
