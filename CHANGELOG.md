@@ -1,3 +1,7 @@
+# 1.0.5
+Renamed project from SimpleYaml to settings_yaml to better reflect its usage and improve its discoverablity in pub.dev.
+Small improvement to the README.md
+
 # 1.0.4
 Moved project to settings_yaml.
 

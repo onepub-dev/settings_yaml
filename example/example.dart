@@ -1,4 +1,4 @@
-import 'package:simpleyaml/simpleyaml.dart';
+import 'package:settings_yaml/settings_yaml.dart';
 
 void main() {
   save();
@@ -7,7 +7,7 @@ void main() {
 }
 
 void save() {
-  var settings = SimpleYaml(filePath: '.settings.yaml');
+  var settings = SettingsYaml(filePath: '.settings.yaml');
 
   settings['dbname'] = 'billing';
   settings['dbusername'] = 'username';
@@ -17,11 +17,14 @@ void save() {
 }
 
 void load() {
-  var settings = SimpleYaml.load(filePath: '.settings.yaml');
+  var settings = SettingsYaml.load(filePath: '.settings.yaml');
 
   var dbname = settings['dbname'];
   var username = settings['dbusername'];
   var password = settings['dbpassword'];
 
   print('dbname $dbname, username: $username, password: $password');
+
+  settings['another_setting'] = 'the number 10';
+  settings.save();
 }

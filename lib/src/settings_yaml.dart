@@ -4,14 +4,15 @@ import 'package:dshell/dshell.dart';
 import 'package:meta/meta.dart';
 import 'package:yaml/yaml.dart';
 
-class SimpleYaml {
+class SettingsYaml {
   YamlDocument _document;
   String filePath;
   var valueMap = <String, dynamic>{};
 
-  SimpleYaml({@required this.filePath});
+  SettingsYaml({@required this.filePath});
 
-  SimpleYaml.fromString({@required String contents, @required this.filePath}) {
+  SettingsYaml.fromString(
+      {@required String contents, @required this.filePath}) {
     /// don't try to load an empty settings file. It will end in tears.
     if (contents == null || contents.trim().isEmpty) return;
 
@@ -24,18 +25,18 @@ class SimpleYaml {
     }
   }
 
-  static SimpleYaml load({String filePath, bool create = false}) {
+  static SettingsYaml load({String filePath, bool create = false}) {
     if (!exists(filePath)) {
       if (create) {
         touch(filePath, create: true);
       } else {
-        throw SimpleYamlException('The yaml file $filePath does not exist');
+        throw SettingsYamlException('The yaml file $filePath does not exist');
       }
     }
 
     var contents = File(filePath).readAsStringSync();
 
-    return SimpleYaml.fromString(contents: contents, filePath: filePath);
+    return SettingsYaml.fromString(contents: contents, filePath: filePath);
   }
 
   void put(String key, String value) {
@@ -64,7 +65,7 @@ class SimpleYaml {
 
   void save() {
     var tmp = FileSync.tempFile();
-    tmp.write('# SimpleYaml settings file');
+    tmp.write('# SettingsYaml settings file');
 
     for (var pair in valueMap.entries) {
       tmp.append('${pair.key}: ${pair.value}');
@@ -116,9 +117,9 @@ class SimpleYaml {
   }
 }
 
-class SimpleYamlException implements Exception {
+class SettingsYamlException implements Exception {
   String message;
-  SimpleYamlException(this.message);
+  SettingsYamlException(this.message);
 
   @override
   String toString() => message;
