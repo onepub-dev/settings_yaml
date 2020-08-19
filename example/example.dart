@@ -7,11 +7,13 @@ void main() {
 }
 
 void save() {
-  var settings = SettingsYaml(filePath: '.settings.yaml');
+  var settings = SettingsYaml.load(filePath: '.settings.yaml');
 
   settings['dbname'] = 'billing';
   settings['dbusername'] = 'username';
   settings['dbpassword'] = 'apassword';
+  settings['timeout'] = 300;
+  settings['coefficient'] = 10.85;
 
   settings.save();
 }
@@ -22,9 +24,10 @@ void load() {
   var dbname = settings['dbname'];
   var username = settings['dbusername'];
   var password = settings['dbpassword'];
+  var timeout = settings['timeout'];
+  var coefficient = settings['coefficient'];
 
-  print('dbname $dbname, username: $username, password: $password');
+  print('dbname $dbname, username: $username, password: $password, timeout: $timeout, coefficient: $coefficient');
 
-  settings['another_setting'] = 'the number 10';
   settings.save();
 }

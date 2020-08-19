@@ -10,7 +10,7 @@ hostname: slayer
 port: 10
 ''';
     var path = '/tmp/settings.yaml';
-    var yaml = SettingsYaml.fromString(contents: content, filePath: path);
+    var yaml = SettingsYaml.fromString(content: content, filePath: path);
     expect(yaml['name'], equals('brett'));
     expect(yaml['hostname'], equals('slayer'));
     expect(yaml['port'], equals(10));
@@ -21,6 +21,7 @@ port: 10
     var content = '''name: brett
 hostname: slayer
 port: 10
+coefficient: 8.25
 ''';
     if (exists(path)) {
       delete(path);
@@ -31,6 +32,7 @@ port: 10
     expect(yaml['name'], equals('brett'));
     expect(yaml['hostname'], equals('slayer'));
     expect(yaml['port'], equals(10));
+    expect(yaml['coefficient'], equals(8.25));
   });
 
   test('SettingsYaml save', () async {
@@ -44,7 +46,7 @@ port: 10
     }
     path.write(content);
 
-    var yaml = SettingsYaml.fromString(contents: content, filePath: path);
+    var yaml = SettingsYaml.fromString(content: content, filePath: path);
     delete(path);
     yaml.save();
 
@@ -61,7 +63,7 @@ port: 10
       delete(path);
     }
 
-    var yaml = SettingsYaml.load(filePath: path, create: true);
+    var yaml = SettingsYaml.load(filePath: path);
     yaml.save();
   });
 
@@ -72,19 +74,21 @@ port: 10
       delete(path);
     }
 
-    var yaml = SettingsYaml.load(filePath: path, create: true);
+    var yaml = SettingsYaml.load(filePath: path);
 
     yaml['name'] = 'brett';
     yaml['hostname'] = 'slayer';
     yaml['port'] = 10;
+    yaml['coefficient'] = 8.25;
 
     expect(yaml['name'], equals('brett'));
     expect(yaml['hostname'], equals('slayer'));
     expect(yaml['port'], equals(10));
+    expect(yaml['coefficient'], equals(8.25));
     yaml.save();
 
     // reload saved data and make certain that its intact.
-    yaml = SettingsYaml.load(filePath: path, create: true);
+    yaml = SettingsYaml.load(filePath: path);
 
     expect(yaml['name'], equals('brett'));
     expect(yaml['hostname'], equals('slayer'));
