@@ -1,3 +1,10 @@
+# 2.0.0
+Further simplification of the api.
+updated example and test to reflect the api changes. Added doco and test for doubles.
+Improved the api doco with examples. 
+Fixed the readme to use the revised class name. 
+Added an integer example.
+
 # 1.0.6
 Updated the readme to include more complete example.
 
