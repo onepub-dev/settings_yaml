@@ -5,11 +5,12 @@ Saving config data:
 ```dart
 void save() {
   /// create a new .settings.yaml
-  var settings = SimpleYaml(filePath: '.settings.yaml');
+  var settings = SettingsYaml(filePath: '.settings.yaml');
 
   settings['dbname'] = 'billing';
   settings['dbusername'] = 'username';
   settings['dbpassword'] = 'apassword';
+  settings['timeout'] = 200;
 
   settings.save();
 }
@@ -20,14 +21,15 @@ Loading config data.
 ```dart
 void load() {
 
-  /// load an existing .settings.yaml
-  var settings = SimpleYaml.load(filePath: '.settings.yaml');
+  /// load an existing .settings.yaml, if it doesn't exist then create it.
+  var settings = SettingsYaml.load(filePath: '.settings.yaml', create: true);
 
   var dbname = settings['dbname'];
   var username = settings['dbusername'];
   var password = settings['dbpassword'];
+  var timeout = settings['timeout'];
 
-  print('dbname $dbname, username: $username, password: $password');
+  print('dbname $dbname, username: $username, password: $password, timeout: $timeout');
 
   /// change something
 
