@@ -1,4 +1,4 @@
-import 'package:dshell/dshell.dart' hide equals;
+import 'package:dcli/dcli.dart' hide equals;
 import 'package:test/test.dart';
 
 import 'package:settings_yaml/settings_yaml.dart';
