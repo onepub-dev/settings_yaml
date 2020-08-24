@@ -1,7 +1,8 @@
 import 'dart:io';
 
-import 'package:dcli/dcli.dart';
 import 'package:meta/meta.dart';
+import 'package:path/path.dart';
+import 'package:settings_yaml/src/util/file_util.dart';
 import 'package:yaml/yaml.dart';
 
 class SettingsYaml {
@@ -51,7 +52,7 @@ class SettingsYaml {
         throw SettingsYamlException(
             'The directory tree above ${truepath(filePath)} does not exist. Create the directory tree and try again.');
       }
-      touch(filePath, create: true);
+      File(filePath).createSync();
     }
 
     var contents = File(filePath).readAsStringSync();
@@ -101,11 +102,11 @@ class SettingsYaml {
   /// settings file to a .bak file.
   /// If the save fails you may need to manually rename the .bak file.
   void save() {
-    var tmp = FileSync.tempFile();
-    tmp.write('# SettingsYaml settings file');
+    var tmp = tempFile();
+    write(tmp, '# SettingsYaml settings file');
 
     for (var pair in valueMap.entries) {
-      tmp.append('${pair.key}: ${pair.value}');
+      append(tmp, '${pair.key}: ${pair.value}');
     }
 
     /// Do a safe save.

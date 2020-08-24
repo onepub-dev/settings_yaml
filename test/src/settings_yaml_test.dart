@@ -1,4 +1,4 @@
-import 'package:dcli/dcli.dart' hide equals;
+import 'package:settings_yaml/src/util/file_util.dart';
 import 'package:test/test.dart';
 
 import 'package:settings_yaml/settings_yaml.dart';
@@ -26,7 +26,7 @@ coefficient: 8.25
     if (exists(path)) {
       delete(path);
     }
-    path.write(content);
+    write(path, content);
 
     var yaml = SettingsYaml.load(filePath: path);
     expect(yaml['name'], equals('brett'));
@@ -44,7 +44,7 @@ port: 10
     if (exists(path)) {
       delete(path);
     }
-    path.write(content);
+    write(path, content);
 
     var yaml = SettingsYaml.fromString(content: content, filePath: path);
     delete(path);

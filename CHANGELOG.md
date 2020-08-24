@@ -1,3 +1,9 @@
+# 2.1.0
+Removed the projects dependency on dcli to reduce the chance of circular dependency conflicts.
+
+# 2.0.1
+upgraded to dcli
+
 # 2.0.0
 Further simplification of the api.
 updated example and test to reflect the api changes. Added doco and test for doubles.
