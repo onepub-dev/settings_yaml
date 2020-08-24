@@ -1,3 +1,6 @@
+# 2.1.1
+upgraded uuid version.
+
 # 2.1.0
 Removed the projects dependency on dcli to reduce the chance of circular dependency conflicts.
 

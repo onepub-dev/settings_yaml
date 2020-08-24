@@ -1,5 +1,5 @@
 name: settings_yaml
-version: 2.1.0
+version: 2.1.1
 homepage: https://github.com/bsutton/settings_yaml
 description: Provides a simple means of saving/loading settings from a yaml file without the yaml fuss.
 environment: 
@@ -8,7 +8,7 @@ dependencies:
   meta: ^1.0.0
   yaml: ^2.2.0
   path: ^1.0.0
-  uuid: ^1.0.0
+  uuid: ^2.0.4
 dev_dependencies: 
   test: ^1.0.0
   pedantic: ^1.9.0
