@@ -35,29 +35,56 @@ class SettingsYaml {
     }
   }
 
-  /// Loads a settings file from the give [filePath].
-  /// The [filePath] must point to a file (not a directory).
-  /// The directory component of [filePath] maybe absolute or relative but
+  /// Loads a settings file from the give [pathToSettings].
+  ///
+  /// If the settings file doesn't exist then it will be created when you call [save].
+  ///
+  /// The [pathToSettings] must point to a file (not a directory).
+  ///
+  /// The directory component of [pathToSettings] maybe absolute or relative but
   /// the entire directory path must exist.
   ///
-  /// If the directory tree of [filePath] doesn't exist then a SettingsYamlException will be thrown.
+  /// If the parent of [pathToSettings] doesn't exist then a SettingsYamlException will be thrown.
   ///
-  /// If you pass [create] = true then if the settings file doesn't already
-  /// exist it will be created.
-  /// [create] defaults to false.
-  ///
-  static SettingsYaml load({@required String filePath}) {
-    if (!exists(filePath)) {
-      if (!exists(dirname(filePath))) {
-        throw SettingsYamlException(
-            'The directory tree above ${truepath(filePath)} does not exist. Create the directory tree and try again.');
-      }
-      File(filePath).createSync();
+  static SettingsYaml load({@required String pathToSettings}) {
+    if (!exists(dirname(pathToSettings))) {
+      throw SettingsYamlException(
+          'The directory tree above ${truepath(pathToSettings)} does not exist. Create the directory tree and try again.');
     }
 
-    var contents = File(filePath).readAsStringSync();
+    String contents;
+    if (exists(pathToSettings)) {
+      contents = File(pathToSettings).readAsStringSync();
+    }
+    contents ??= '';
 
-    return SettingsYaml.fromString(content: contents, filePath: filePath);
+    return SettingsYaml.fromString(content: contents, filePath: pathToSettings);
+  }
+
+  /// Saves the settings back to the settings file.
+  /// To avoid a corrupted file in the event of a crash we first copy the existing
+  /// settings file to a .bak file.
+  /// If the save fails you may need to manually rename the .bak file.
+  void save() {
+    var tmp = tempFile();
+    write(tmp, '# SettingsYaml settings file');
+
+    for (var pair in valueMap.entries) {
+      append(tmp, '${pair.key}: ${pair.value}');
+    }
+
+    /// Do a safe save.
+    var back = '$filePath.bak';
+    if (exists(back)) {
+      delete(back);
+    }
+    if (exists(filePath)) {
+      move(filePath, back);
+    }
+    move(tmp, filePath);
+    if (exists(back)) {
+      delete(back);
+    }
   }
 
   // void put(String key, String value) {
@@ -96,32 +123,6 @@ class SettingsYaml {
   //       return parent.value;
   //     }
   //   }
-
-  /// Saves the settings back to the settings file.
-  /// To avoid a corrupted file we first copy the existing
-  /// settings file to a .bak file.
-  /// If the save fails you may need to manually rename the .bak file.
-  void save() {
-    var tmp = tempFile();
-    write(tmp, '# SettingsYaml settings file');
-
-    for (var pair in valueMap.entries) {
-      append(tmp, '${pair.key}: ${pair.value}');
-    }
-
-    /// Do a safe save.
-    var back = '$filePath.bak';
-    if (exists(back)) {
-      delete(back);
-    }
-    if (exists(filePath)) {
-      move(filePath, back);
-    }
-    move(tmp, filePath);
-    if (exists(back)) {
-      delete(back);
-    }
-  }
 
   /// reads the value of a top level [key].
   ///

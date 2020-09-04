@@ -1,3 +1,7 @@
+# 2.1.2
+cleaned up the logic of the 'load' method.
+It no longer creates the settings file if it doesn't exists. We leave that to the save method.
+
 # 2.1.1
 upgraded uuid version.
 

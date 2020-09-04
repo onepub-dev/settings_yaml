@@ -7,7 +7,7 @@ void main() {
 }
 
 void save() {
-  var settings = SettingsYaml.load(filePath: '.settings.yaml');
+  var settings = SettingsYaml.load(pathToSettings: '.settings.yaml');
 
   settings['dbname'] = 'billing';
   settings['dbusername'] = 'username';
@@ -19,7 +19,7 @@ void save() {
 }
 
 void load() {
-  var settings = SettingsYaml.load(filePath: '.settings.yaml');
+  var settings = SettingsYaml.load(pathToSettings: '.settings.yaml');
 
   var dbname = settings['dbname'];
   var username = settings['dbusername'];
