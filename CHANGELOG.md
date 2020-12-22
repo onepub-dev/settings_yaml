@@ -1,3 +1,6 @@
+# 2.1.3
+reduced the min dart sdk to 2.7.
+
 # 2.1.2
 cleaned up the logic of the 'load' method.
 It no longer creates the settings file if it doesn't exists. We leave that to the save method.
