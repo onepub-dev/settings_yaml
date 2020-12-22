@@ -5,7 +5,7 @@ Saving config data:
 ```dart
 void save() {
   /// create a new .settings.yaml
-  var settings = SettingsYaml(filePath: '.settings.yaml');
+  var settings = SettingsYaml.load(pathToSettings: '.settings.yaml');
 
   settings['dbname'] = 'billing';
   settings['dbusername'] = 'username';
@@ -22,7 +22,7 @@ Loading config data.
 void load() {
 
   /// load an existing .settings.yaml, if it doesn't exist then create it.
-  var settings = SettingsYaml.load(filePath: '.settings.yaml', create: true);
+  var settings = SettingsYaml.load(pathToSettings: '.settings.yaml', create: true);
 
   var dbname = settings['dbname'];
   var username = settings['dbusername'];
