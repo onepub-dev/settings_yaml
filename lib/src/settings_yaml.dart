@@ -28,11 +28,15 @@ class SettingsYaml {
 
     _document = loadYamlDocument(content);
 
-    var topMap = _document.contents as YamlMap;
+    if (_document.contents is YamlMap) {
+      var topMap = _document.contents as YamlMap;
 
-    for (var pair in topMap.value.entries) {
-      valueMap[pair.key as String] = pair.value;
+      for (var pair in topMap.value.entries) {
+        valueMap[pair.key as String] = pair.value;
+      }
     }
+
+    /// else the settings file was empty.
   }
 
   /// Loads a settings file from the give [pathToSettings].
@@ -87,11 +91,9 @@ class SettingsYaml {
     }
   }
 
-  // void put(String key, String value) {
-  //   valueMap[key] = value;
-  // }
-
-  /// Returns the value for the given key
+  /// Returns the value for the given key.
+  ///
+  /// If the key doesn't exists then null is returned.
   /// ```
   /// var settings = SettingsYaml.load('mysettings.yaml');
   /// var password = settings['password'];
@@ -109,20 +111,6 @@ class SettingsYaml {
   /// ```
   ///
   void operator []=(String path, dynamic value) => valueMap[path] = value;
-
-  // String operator [](String path) {
-  //   var parts = path.split('.');
-  //   var len = parts.length;
-
-  //   YamlNode parent;
-  //   for (var i = 0; i < len; i++) {
-  //     // is this the last part
-  //     if (i == len - 1) {
-  //       // last part we are after the value.
-
-  //       return parent.value;
-  //     }
-  //   }
 
   /// reads the value of a top level [key].
   ///

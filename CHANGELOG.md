@@ -1,3 +1,10 @@
+# 2.1.5
+Fixed a bug when trying to load a settings file that existed but was empty.
+
+
+# 2.1.4
+Corrected the constructor calls on the readme page.
+
 # 2.1.3
 reduced the min dart sdk to 2.7.
 
