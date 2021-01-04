@@ -1,3 +1,7 @@
+
+# 3.0.0-nullsaftey.0
+Converted to null saftey with some non-null safe dependencies.
+
 # 2.1.5
 Fixed a bug when trying to load a settings file that existed but was empty.
 

@@ -48,7 +48,7 @@ class FileSync {
   /// If [newline] is null then no line terminator will
   /// be added.
   void write(String line, {String newline = '\n'}) {
-    line += newline ;
+    line += newline;
     _raf.truncateSync(0);
 
     _raf.setPositionSync(0);
@@ -60,7 +60,7 @@ class FileSync {
   /// Appends the [line] to the file
   /// If [newLine] is true then append a newline after the line.
   void append(String line, {String newline = '\n'}) {
-    line += newline ;
+    line += newline;
 
     _raf.setPositionSync(_raf.lengthSync());
     _raf.writeStringSync(line);
