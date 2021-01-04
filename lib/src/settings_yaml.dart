@@ -1,12 +1,11 @@
 import 'dart:io';
 
-import 'package:meta/meta.dart';
 import 'package:path/path.dart';
 import 'package:settings_yaml/src/util/file_util.dart';
 import 'package:yaml/yaml.dart';
 
 class SettingsYaml {
-  YamlDocument _document;
+  late YamlDocument _document;
   String filePath;
   var valueMap = <String, dynamic>{};
 
@@ -22,9 +21,9 @@ class SettingsYaml {
   ///
   /// The [filePath] is the path/file name that will be used when
   /// save is called.
-  SettingsYaml.fromString({@required String content, @required this.filePath}) {
+  SettingsYaml.fromString({required String content, required this.filePath}) {
     /// don't try to load an empty settings file. It will end in tears.
-    if (content == null || content.trim().isEmpty) return;
+    if (content.trim().isEmpty) return;
 
     _document = loadYamlDocument(content);
 
@@ -50,13 +49,13 @@ class SettingsYaml {
   ///
   /// If the parent of [pathToSettings] doesn't exist then a SettingsYamlException will be thrown.
   ///
-  static SettingsYaml load({@required String pathToSettings}) {
+  static SettingsYaml load({required String pathToSettings}) {
     if (!exists(dirname(pathToSettings))) {
       throw SettingsYamlException(
           'The directory tree above ${truepath(pathToSettings)} does not exist. Create the directory tree and try again.');
     }
 
-    String contents;
+    String? contents;
     if (exists(pathToSettings)) {
       contents = File(pathToSettings).readAsStringSync();
     }
@@ -115,31 +114,31 @@ class SettingsYaml {
   /// reads the value of a top level [key].
   ///
   // ignore: unused_element
-  String _getValue(String key) {
+  String? _getValue(String key) {
     if (_document.contents.value == null) {
       return null;
     } else {
-      return _document.contents.value[key] as String;
+      return _document.contents.value[key] as String?;
     }
   }
 
   /// returns a list of elements attached to [key].
   // ignore: unused_element
-  YamlList _getList(String key) {
+  YamlList? _getList(String key) {
     if (_document.contents.value == null) {
       return null;
     } else {
-      return _document.contents.value[key] as YamlList;
+      return _document.contents.value[key] as YamlList?;
     }
   }
 
   /// returns the map of elements attached to [key].
   // ignore: unused_element
-  YamlMap _getMap(String key) {
+  YamlMap? _getMap(String key) {
     if (_document.contents.value == null) {
       return null;
     } else {
-      return _document.contents.value[key] as YamlMap;
+      return _document.contents.value[key] as YamlMap?;
     }
   }
 }

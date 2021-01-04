@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:path/path.dart';
+// ignore: import_of_legacy_library_into_null_safe
 import 'package:uuid/uuid.dart';
 
 import 'file_sync.dart';
@@ -9,8 +10,8 @@ import 'file_sync.dart';
 ///
 /// Throws [ArgumentError] if [path] is null or an empty string.
 bool exists(String path, {bool followLinks = false}) {
-  if (path == null || path.isEmpty) {
-    throw ArgumentError('path must not be null or empty');
+  if (path.isEmpty) {
+    throw ArgumentError('path must not be empty');
   }
   //return FileSystemEntity.existsSync(path);
   return FileSystemEntity.typeSync(path, followLinks: followLinks) !=
@@ -28,12 +29,12 @@ bool exists(String path, {bool followLinks = false}) {
 /// is then canonicalize to remove any segments (.. or .).
 ///
 String truepath(String part1,
-        [String part2,
-        String part3,
-        String part4,
-        String part5,
-        String part6,
-        String part7]) =>
+        [String? part2,
+        String? part3,
+        String? part4,
+        String? part5,
+        String? part6,
+        String? part7]) =>
     canonicalize(absolute(part1, part2, part3, part4, part5, part6, part7));
 
 void delete(String path) {
@@ -48,9 +49,7 @@ void delete(String path) {
 /// The temp file name will be <uuid>.tmp
 /// unless you provide a [suffix] in which
 /// case the file name will be <uuid>.<suffix>
-String tempFile({String suffix}) {
-  suffix ??= 'tmp';
-
+String tempFile({String suffix = 'tmp'}) {
   if (!suffix.startsWith('.')) {
     suffix = '.$suffix';
   }
@@ -72,7 +71,7 @@ void move(String from, String to, {bool overwrite = false}) {
   try {
     File(from).renameSync(dest);
   } on FileSystemException catch (e) {
-    if (e.osError != null && e.osError.errorCode == 18) {
+    if (e.osError != null && e.osError!.errorCode == 18) {
       /// Invalid cross-device link
       /// We can't move files across a partition so
       /// do a copy/delete.
@@ -147,7 +146,7 @@ void append(String path, String line, {String newline = '\n'}) {
 
 /// Thrown when the [move] function encouters an error.
 class MoveException implements Exception {
-  String message;
+  late String message;
 
   /// Thrown when the [move] function encouters an error.
   MoveException(String message);
@@ -158,7 +157,7 @@ class MoveException implements Exception {
 
 /// Thrown when the [move] function encouters an error.
 class CopyException implements Exception {
-  String message;
+  late String message;
 
   /// Thrown when the [move] function encouters an error.
   CopyException(String message);
