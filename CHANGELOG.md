@@ -1,3 +1,7 @@
+# 3.0.0-nullsafety.1
+upgraded to latest packags.
+removed unnecessary null checks
+
 
 # 3.0.0-nullsaftey.0
 Converted to null saftey with some non-null safe dependencies.
