@@ -79,13 +79,13 @@ void move(String from, String to, {bool overwrite = false}) {
       delete(from);
     } else {
       throw MoveException(
-          'The Move of ${truepath(from)} to ${truepath(dest)} failed. Error $e');
+          'The Move of ${truepath(from??'null')} to ${truepath(dest??'null')} failed. Error $e');
     }
   }
   // ignore: avoid_catches_without_on_clauses
   catch (e) {
     throw MoveException(
-        'The Move of ${truepath(from)} to ${truepath(dest)} failed. Error $e');
+        'The Move of ${truepath(from??'null')} to ${truepath(dest??'null')} failed. Error $e');
   }
 }
 
