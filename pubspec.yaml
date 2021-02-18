@@ -1,9 +1,9 @@
 name: settings_yaml
-version: 3.0.1-nullsafety.1
+version: 3.0.1
 homepage: https://github.com/bsutton/settings_yaml
 description: Provides a simple means of saving/loading settings from a yaml file without the yaml fuss.
 environment: 
-  sdk: '>=2.12.0-0 <3.0.0'
+  sdk: '>=2.12.0-259.9.beta <3.0.0'
 dependencies: 
   meta: ^1.3.0
   yaml: ^3.0.0
