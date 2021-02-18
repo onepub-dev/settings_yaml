@@ -1,3 +1,6 @@
+# 3.0.1
+stable release of nnbd.
+
 # 3.0.1-nullsafety.1
 because I can't spell.
 
