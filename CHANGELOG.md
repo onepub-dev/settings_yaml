@@ -1,4 +1,7 @@
 # 3.0.3
+upgraded to release version of uuid.
+
+# 3.0.3
 Added examples of using the validXXX methods.
 
 # 3.0.2
