@@ -14,6 +14,7 @@ void save() {
   settings['dbpassword'] = 'apassword';
   settings['timeout'] = 300;
   settings['coefficient'] = 10.85;
+  settings['active'] = true;
 
   settings.save();
 }
@@ -21,13 +22,23 @@ void save() {
 void load() {
   var settings = SettingsYaml.load(pathToSettings: '.settings.yaml');
 
-  var dbname = settings['dbname'];
-  var username = settings['dbusername'];
-  var password = settings['dbpassword'];
-  var timeout = settings['timeout'];
-  var coefficient = settings['coefficient'];
+  assert(settings.validString('dbname'));
+  assert(settings.validInt('timeout'));
+  assert(settings.validDouble('coefficient'));
+  assert(settings.validBool('active'));
 
-  print('dbname $dbname, username: $username, password: $password, timeout: $timeout, coefficient: $coefficient');
+  var dbname = settings['dbname'] as String;
+  // we haven't validated the dbusername and dbpassword so
+  // they could be null.
+  var username = settings['dbusername'] as String?;
+  var password = settings['dbpassword'] as String?;
+  
+  var timeout = settings['timeout'] as int;
+  var coefficient = settings['coefficient'] as double;
+  var active = settings['active'] as bool;
+
+  print(
+      'dbname $dbname, username: $username, password: $password, timeout: $timeout, coefficient: $coefficient, active: $active');
 
   settings.save();
 }
