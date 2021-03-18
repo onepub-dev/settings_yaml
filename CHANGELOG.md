@@ -1,3 +1,6 @@
+# 3.0.2
+Added methods validXXX which lets you check that a key exists, has a value and that it is a specific type.
+
 # 3.0.1
 stable release of nnbd.
 
