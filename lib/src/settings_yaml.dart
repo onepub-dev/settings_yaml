@@ -141,6 +141,28 @@ class SettingsYaml {
       return _document.contents.value[key] as YamlMap?;
     }
   }
+
+  /// Returns true if the key has a value which is a
+  /// String which is non-null and not empty
+  bool validString(String key) {
+    final value = _document.contents.value[key];
+    return (value != null && value is String && value.isNotEmpty);
+  }
+
+  bool validInt(String key) {
+    final value = _document.contents.value[key];
+    return (value != null && value is int);
+  }
+
+  bool validDouble(String key) {
+    final value = _document.contents.value[key];
+    return (value != null && value is double);
+  }
+
+  bool validBool(String key) {
+    final value = _document.contents.value[key];
+    return (value != null && value is bool);
+  }
 }
 
 class SettingsYamlException implements Exception {
