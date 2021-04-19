@@ -138,4 +138,23 @@ volume: 10.0
     /// non- existant key
     expect(yaml.validString('badkey'), equals(false));
   });
+
+  test('force String', () async {
+    var path = '/tmp/settings.yaml';
+
+    var content = '''name: brett
+hostname: slayer
+port: 10
+active: true
+volume: 10.0
+imageid: "65385002e970"
+''';
+
+    var yaml = SettingsYaml.fromString(content: content, filePath: path);
+
+    yaml.save();
+
+    yaml = SettingsYaml.load(pathToSettings: path);
+    expect(yaml.validString('imageid'), equals(true));
+  });
 }

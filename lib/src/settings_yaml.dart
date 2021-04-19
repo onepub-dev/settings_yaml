@@ -73,7 +73,13 @@ class SettingsYaml {
     write(tmp, '# SettingsYaml settings file');
 
     for (var pair in valueMap.entries) {
-      append(tmp, '${pair.key}: ${pair.value}');
+      if (pair.value is String) {
+        /// quote the string to ensure it doesn't get interpreted
+        /// as a num/bool etc and import.
+        append(tmp, '${pair.key}: "${pair.value}"');
+      } else {
+        append(tmp, '${pair.key}: ${pair.value}');
+      }
     }
 
     /// Do a safe save.
