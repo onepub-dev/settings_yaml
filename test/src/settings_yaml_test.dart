@@ -1,4 +1,3 @@
-// @dart=2.9
 import 'package:settings_yaml/src/util/file_util.dart';
 import 'package:test/test.dart';
 
