@@ -7,6 +7,8 @@ import 'package:yaml/yaml.dart';
 class SettingsYaml {
   late YamlDocument _document;
   String filePath;
+
+  /// The complete map of key/value pairs
   var valueMap = <String, dynamic>{};
 
   /// Loads settings from a string.
