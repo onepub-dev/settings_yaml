@@ -5,7 +5,7 @@ import 'package:settings_yaml/src/util/file_util.dart';
 import 'package:yaml/yaml.dart';
 
 class SettingsYaml {
-  late YamlDocument? _document;
+  YamlDocument? _document;
   String filePath;
 
   /// The complete map of key/value pairs

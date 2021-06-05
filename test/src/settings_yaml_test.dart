@@ -21,6 +21,7 @@ port: 10
     var path = '/tmp/settings.yaml';
     var yaml = SettingsYaml.fromString(content: content, filePath: path);
     expect(yaml['name'], isNull);
+    expect(yaml.validString('username'), false);
   });
   test('SettingsYaml fromFile', () async {
     var path = '/tmp/settings.yaml';
