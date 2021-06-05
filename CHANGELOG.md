@@ -1,3 +1,6 @@
+# 3.0.5
+Fixed an npe when the document is passed empty content.
+
 # 3.0.4
 Fixed a bug where string that looked like no.s are being imported as numbers rather than strings. We know quote strings to ensure this.
 
