@@ -16,6 +16,12 @@ port: 10
     expect(yaml['port'], equals(10));
   });
 
+  test('SettingsYaml fromString - empty content', () async {
+    var content = '';
+    var path = '/tmp/settings.yaml';
+    var yaml = SettingsYaml.fromString(content: content, filePath: path);
+    expect(yaml['name'], isNull);
+  });
   test('SettingsYaml fromFile', () async {
     var path = '/tmp/settings.yaml';
     var content = '''name: brett

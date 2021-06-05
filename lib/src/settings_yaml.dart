@@ -5,7 +5,7 @@ import 'package:settings_yaml/src/util/file_util.dart';
 import 'package:yaml/yaml.dart';
 
 class SettingsYaml {
-  late YamlDocument _document;
+  late YamlDocument? _document;
   String filePath;
 
   /// The complete map of key/value pairs
@@ -29,8 +29,8 @@ class SettingsYaml {
 
     _document = loadYamlDocument(content);
 
-    if (_document.contents is YamlMap) {
-      var topMap = _document.contents as YamlMap;
+    if (_document!.contents is YamlMap) {
+      var topMap = _document!.contents as YamlMap;
 
       for (var pair in topMap.value.entries) {
         valueMap[pair.key as String] = pair.value;
@@ -123,52 +123,52 @@ class SettingsYaml {
   ///
   // ignore: unused_element
   String? _getValue(String key) {
-    if (_document.contents.value == null) {
+    if (_document?.contents.value == null) {
       return null;
     } else {
-      return _document.contents.value[key] as String?;
+      return _document!.contents.value[key] as String?;
     }
   }
 
   /// returns a list of elements attached to [key].
   // ignore: unused_element
   YamlList? _getList(String key) {
-    if (_document.contents.value == null) {
+    if (_document?.contents.value == null) {
       return null;
     } else {
-      return _document.contents.value[key] as YamlList?;
+      return _document!.contents.value[key] as YamlList?;
     }
   }
 
   /// returns the map of elements attached to [key].
   // ignore: unused_element
   YamlMap? _getMap(String key) {
-    if (_document.contents.value == null) {
+    if (_document?.contents.value == null) {
       return null;
     } else {
-      return _document.contents.value[key] as YamlMap?;
+      return _document!.contents.value[key] as YamlMap?;
     }
   }
 
   /// Returns true if the key has a value which is a
   /// String which is non-null and not empty
   bool validString(String key) {
-    final value = _document.contents.value[key];
+    final value = _document?.contents.value[key];
     return (value != null && value is String && value.isNotEmpty);
   }
 
   bool validInt(String key) {
-    final value = _document.contents.value[key];
+    final value = _document?.contents.value[key];
     return (value != null && value is int);
   }
 
   bool validDouble(String key) {
-    final value = _document.contents.value[key];
+    final value = _document?.contents.value[key];
     return (value != null && value is double);
   }
 
   bool validBool(String key) {
-    final value = _document.contents.value[key];
+    final value = _document?.contents.value[key];
     return (value != null && value is bool);
   }
 }
