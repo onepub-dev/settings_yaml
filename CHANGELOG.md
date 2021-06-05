@@ -1,3 +1,6 @@
+# 3.0.6
+Fixed another bug related to empty content.
+
 # 3.0.5
 Fixed an npe when the document is passed empty content.
 
