@@ -1,3 +1,6 @@
+# 3.1.1
+- Added method asStringList to make it easier to extract a list of strings from the yaml without having to do lots of casting.
+
 # 3.1.0
 - Added support for lists and single level maps.
 
