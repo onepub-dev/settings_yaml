@@ -9,6 +9,8 @@ dependencies:
   yaml: ^3.0.0
   path: ^1.8.0
   uuid: ^3.0.0
+  collection: ^1.15.0
 dev_dependencies: 
   test: ^1.16.2
-  pedantic: ^1.10.0
+  lints: ^1.0.0
+  dcli: ^1.10.0

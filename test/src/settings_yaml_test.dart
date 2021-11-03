@@ -1,4 +1,5 @@
-import 'package:settings_yaml/src/util/file_util.dart';
+import 'package:collection/collection.dart';
+import 'package:dcli/dcli.dart' hide equals;
 import 'package:test/test.dart';
 
 import 'package:settings_yaml/settings_yaml.dart';
@@ -14,6 +15,57 @@ port: 10
     expect(yaml['name'], equals('brett'));
     expect(yaml['hostname'], equals('slayer'));
     expect(yaml['port'], equals(10));
+  });
+
+  test('SettingsYaml String list', () async {
+    var content = '''name: brett
+hostnames: [one, two, three]
+''';
+    var path = '/tmp/settings.yaml';
+    var yaml = SettingsYaml.fromString(content: content, filePath: path);
+    expect(yaml['hostnames'], equals(['one', 'two', 'three']));
+
+    withTempFile((pathTo) {
+      var yaml = SettingsYaml.load(pathToSettings: pathTo);
+      yaml['list'] = <String>['one', 'two', 'three'];
+      yaml.save();
+
+      yaml = SettingsYaml.load(pathToSettings: pathTo);
+
+      expect(yaml['list'], equals(['one', 'two', 'three']));
+    });
+  });
+
+  test('SettingsYaml String map', () async {
+    var content = '''name: brett
+hostnames: 
+  host1: one
+  host2: two
+  host3: three
+''';
+    var path = '/tmp/settings.yaml';
+    var yaml = SettingsYaml.fromString(content: content, filePath: path);
+    expect(
+        MapEquality().equals(yaml['hostnames'],
+            {'host1': 'one', 'host2': 'two', 'host3': 'three'}),
+        isTrue);
+
+    withTempFile((pathTo) {
+      var yaml = SettingsYaml.load(pathToSettings: pathTo);
+      yaml['map'] = <String, String>{
+        'host1': 'one',
+        'host2': 'two',
+        'host3': 'three'
+      };
+      yaml.save();
+
+      yaml = SettingsYaml.load(pathToSettings: pathTo);
+
+      expect(
+          MapEquality().equals(
+              yaml['map'], {'host1': 'one', 'host2': 'two', 'host3': 'three'}),
+          isTrue);
+    });
   });
 
   test('SettingsYaml fromString - empty content', () async {
@@ -33,7 +85,7 @@ coefficient: 8.25
     if (exists(path)) {
       delete(path);
     }
-    write(path, content);
+    path.write(content);
 
     var yaml = SettingsYaml.load(pathToSettings: path);
     expect(yaml['name'], equals('brett'));
@@ -51,7 +103,7 @@ port: 10
     if (exists(path)) {
       delete(path);
     }
-    write(path, content);
+    path.write(content);
 
     var yaml = SettingsYaml.fromString(content: content, filePath: path);
     delete(path);

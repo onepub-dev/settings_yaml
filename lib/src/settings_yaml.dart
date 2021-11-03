@@ -105,7 +105,7 @@ class SettingsYaml {
   /// var settings = SettingsYaml.load('mysettings.yaml');
   /// var password = settings['password'];
   /// ```
-  dynamic operator [](String path) => valueMap[path];
+  dynamic operator [](String path) => _normalizedValue(path);
 
   /// Adds or Updates the given key/value pair.
   ///
@@ -170,6 +170,40 @@ class SettingsYaml {
   bool validBool(String key) {
     final value = _document?.contents.value[key];
     return (value != null && value is bool);
+  }
+
+  dynamic _normalizedValue(String path) {
+    var value = valueMap[path];
+
+    return _convertNode(value);
+  }
+
+  dynamic _convertNode(dynamic value) {
+    if (value is YamlList) return _toList(value);
+
+    if (value is YamlMap) return _toMap(value);
+
+    return value;
+  }
+
+  List<dynamic> _toList(YamlList yamlList) {
+    var list = <dynamic>[];
+    for (var e in yamlList) {
+      list.add(_convertNode(e));
+    }
+    return list;
+  }
+
+  Map<String, dynamic> _toMap(YamlMap yamlMap) {
+    var map = <String, dynamic>{};
+    yamlMap.forEach((k, v) {
+      if (k is YamlScalar) {
+        map[(k).value.toString()] = _convertNode(v);
+      } else {
+        map[k.toString()] = _convertNode(v);
+      }
+    });
+    return map;
   }
 }
 
