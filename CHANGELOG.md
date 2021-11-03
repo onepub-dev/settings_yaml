@@ -1,3 +1,6 @@
+# 3.1.0
+- Added support for lists and single level maps.
+
 # 3.0.6
 Fixed another bug related to empty content.
 
