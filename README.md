@@ -11,7 +11,7 @@ void save() {
   settings['dbusername'] = 'username';
   settings['dbpassword'] = 'apassword';
   settings['timeout'] = 200;
-  settings['numbers'] = <String>['one', 'two', 'three'];
+  settings['ats'] = <String>['cat', 'bat', 'rat'];
   settings['hosts'] = <String, String>{
         'host1': 'one',
         'host2': 'two',
@@ -34,7 +34,10 @@ void load() {
   var username = settings['dbusername']as String;
   var password = settings['dbpassword']as String;
   var timeout = settings['timeout']as String;
-  var numbers = settings['numbers'] as List<String>;
+  var ats = settings['ats']; // List<dynamic>
+
+  List<String> atsAsString = yaml.asStringList['ats'];
+
   var hosts = settings['hosts'] as Map<String, String>;
 
 
@@ -47,7 +50,7 @@ void load() {
         'host1': 'one',
         'host2': 'two',
         'host3': 'three';
-  settings['list'] = <String>['one', 'two', 'three'];
+  settings['ats'] = <String>['cat', 'bat', 'rat'];
 
   settings.save();
 }

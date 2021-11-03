@@ -33,6 +33,12 @@ hostnames: [one, two, three]
       yaml = SettingsYaml.load(pathToSettings: pathTo);
 
       expect(yaml['list'], equals(['one', 'two', 'three']));
+
+      List<String> numbers = (yaml['list'] as List<dynamic>).cast<String>();
+      expect(numbers, equals(['one', 'two', 'three']));
+
+      List<String> atsAsString = yaml.asStringList('list');
+      expect(atsAsString, equals(['one', 'two', 'three']));
     });
   });
 

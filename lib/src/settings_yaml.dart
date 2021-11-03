@@ -40,6 +40,13 @@ class SettingsYaml {
     /// else the settings file was empty.
   }
 
+  /// Returns a list at [path] as a String list.
+  /// If [path] does not contain a List<String>
+  /// an exception will be thrown.
+  List<String> asStringList(String path) {
+    return (valueMap[path] as List<dynamic>).cast<String>();
+  }
+
   /// Loads a settings file from the give [pathToSettings].
   ///
   /// If the settings file doesn't exist then it will be created when you call [save].
