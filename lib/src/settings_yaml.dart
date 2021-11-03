@@ -41,34 +41,52 @@ class SettingsYaml {
   }
 
   /// Returns a list at [path] as a String list.
-  /// If [path] does not contain a List<String>
-  /// an exception will be thrown.
-  List<String> asStringList(String path) {
-    return (valueMap[path] as List<dynamic>).cast<String>();
+  /// If the key isn't a valid List<String>  then [defaultValue] is returned
+  /// Use [validStringList] to determine if the key exists and is
+  /// a valid List<String>.
+  List<String> asStringList(String path,
+      {List<String> defaultValue = const <String>[]}) {
+    if (validStringList(path)) {
+      return (valueMap[path] as List<dynamic>).cast<String>();
+    } else {
+      return defaultValue;
+    }
   }
 
   /// returns the value at [path] as an String.
   /// If the value isn't an String then an exception will be thrown.
-  String asString(String path) {
-    return valueMap[path] as String;
+  /// If the key isn't a valid String then [defaultValue] is returned
+  /// Use [validString] to determine if the key exists and is
+  /// a valid String.
+  String asString(String path, {String defaultValue = ''}) {
+    return validString(path) ? valueMap[path] as String : defaultValue;
   }
 
   /// returns the value at [path] as an bool.
   /// If the value isn't an bool then an exception will be thrown.
-  bool asBool(String path) {
-    return valueMap[path] as bool;
+  /// If the key isn't a valid bool then [defaultValue] is returned
+  /// Use [validBool] to determine if the key exists and is
+  /// a valid bool.
+  bool asBool(String path, {bool defaultValue = true}) {
+    return validBool(path) ? valueMap[path] as bool : defaultValue;
   }
 
   /// returns the value at [path] as an int.
   /// If the value isn't an int then an exception will be thrown.
-  int asInt(String path) {
-    return valueMap[path] as int;
+  /// If the key isn't a valid int then [defaultValue] is returned
+  /// Use [validInt] to determine if the key exists and is
+  /// a valid int.
+  int asInt(String path, {int defaultValue = 0}) {
+    return validInt(path) ? valueMap[path] as int : defaultValue;
   }
 
   /// returns the value at [path] as an double.
   /// If the value isn't an double then an exception will be thrown.
-  double asDouble(String path) {
-    return valueMap[path] as double;
+  /// If the key isn't a valid int then [defaultValue] is returned.
+  /// Use [validDouble] to determine if the key exists and is
+  /// a valid double.
+  double asDouble(String path, {double defaultValue = 0.0}) {
+    return validDouble(path) ? valueMap[path] as double : defaultValue;
   }
 
   /// Loads a settings file from the give [pathToSettings].
@@ -188,16 +206,27 @@ class SettingsYaml {
     return (value != null && value is String && value.isNotEmpty);
   }
 
+  bool validStringList(String key) {
+    final value = _document?.contents.value[key];
+    return (value != null && value is List<dynamic> && value.isNotEmpty);
+  }
+
+  /// Returns true if the key has a value which is an
+  /// int. Empty or null value returns false.
   bool validInt(String key) {
     final value = _document?.contents.value[key];
     return (value != null && value is int);
   }
 
+  /// Returns true if the key has a value which is a
+  /// double. Empty or null value returns false.
   bool validDouble(String key) {
     final value = _document?.contents.value[key];
     return (value != null && value is double);
   }
 
+  /// Returns true if the key has a value which is a
+  /// bool. Empty or null value returns false.
   bool validBool(String key) {
     final value = _document?.contents.value[key];
     return (value != null && value is bool);

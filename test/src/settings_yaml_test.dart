@@ -218,6 +218,65 @@ volume: 10.0
     expect(yaml.validString('badkey'), equals(false));
   });
 
+  test('default Values - good content', () async {
+    var path = '/tmp/settings.yaml';
+
+    var goodContent = '''name: brett
+hostname: slayer
+port: 10
+active: true
+volume: 10.1
+imageid: "65385002e970"
+list: [one, two, three]
+''';
+
+    var yaml = SettingsYaml.fromString(content: goodContent, filePath: path);
+
+    expect(yaml.validString('hostname'), equals(true));
+    expect(yaml.validInt('port'), equals(true));
+    expect(yaml.validBool('active'), equals(true));
+    expect(yaml.validDouble('volume'), equals(true));
+    expect(yaml.validString('imageid'), equals(true));
+    expect(yaml.validStringList('list'), equals(true));
+
+    expect(yaml.asString('hostname'), equals('slayer'));
+    expect(yaml.asInt('port'), equals(10));
+    expect(yaml.asBool('active'), isTrue);
+    expect(yaml.asDouble('volume'), equals(10.1));
+    expect(yaml.asString('imageid'), equals("65385002e970"));
+    expect(yaml.asStringList('list'), equals(['one', 'two', 'three']));
+  });
+
+  test('default Values - bad content', () async {
+    var path = '/tmp/settings.yaml';
+
+    var badContent = '''name: brett
+hostname: 
+port: "abc"
+active: fred
+volume: "its heavey"
+imageid: "65385002e970"
+list: 
+''';
+
+    var yaml = SettingsYaml.fromString(content: badContent, filePath: path);
+    expect(yaml.validString('hostname'), isFalse);
+    expect(yaml.validInt('port'), isFalse);
+    expect(yaml.validBool('active'), isFalse);
+    expect(yaml.validBool('volume'), isFalse);
+    expect(yaml.validDouble('imageid'), isFalse);
+    expect(yaml.validStringList('list'), isFalse);
+
+    expect(yaml.asString('hostname', defaultValue: 'good'), equals('good'));
+    expect(yaml.asInt('port', defaultValue: 11), equals(11));
+    expect(yaml.asBool('active', defaultValue: true), isTrue);
+    expect(yaml.asDouble('volume', defaultValue: 10.2), equals(10.2));
+    expect(
+        yaml.asString('imageid', defaultValue: 'hi'), equals("65385002e970"));
+    expect(yaml.asStringList('list', defaultValue: ['a', 'b', 'c']),
+        equals(['a', 'b', 'c']));
+  });
+
   test('force String', () async {
     var path = '/tmp/settings.yaml';
 
