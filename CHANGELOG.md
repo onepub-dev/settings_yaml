@@ -1,3 +1,6 @@
+# 3.2.0
+- Added defaults to each of the 'as' methods to make it easier to handle settings file that are empty.
+
 # 3.1.1
 - Added method asStringList to make it easier to extract a list of strings from the yaml without having to do lots of casting.
 
