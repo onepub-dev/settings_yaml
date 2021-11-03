@@ -47,6 +47,30 @@ class SettingsYaml {
     return (valueMap[path] as List<dynamic>).cast<String>();
   }
 
+  /// returns the value at [path] as an String.
+  /// If the value isn't an String then an exception will be thrown.
+  String asString(String path) {
+    return valueMap[path] as String;
+  }
+
+  /// returns the value at [path] as an bool.
+  /// If the value isn't an bool then an exception will be thrown.
+  bool asBool(String path) {
+    return valueMap[path] as bool;
+  }
+
+  /// returns the value at [path] as an int.
+  /// If the value isn't an int then an exception will be thrown.
+  int asInt(String path) {
+    return valueMap[path] as int;
+  }
+
+  /// returns the value at [path] as an double.
+  /// If the value isn't an double then an exception will be thrown.
+  double asDouble(String path) {
+    return valueMap[path] as double;
+  }
+
   /// Loads a settings file from the give [pathToSettings].
   ///
   /// If the settings file doesn't exist then it will be created when you call [save].

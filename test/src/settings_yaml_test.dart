@@ -17,6 +17,21 @@ port: 10
     expect(yaml['port'], equals(10));
   });
 
+  test('casting', () async {
+    var content = '''name: brett
+string: slayer
+int: 10
+double: 10.1
+bool: true
+''';
+    var path = '/tmp/settings.yaml';
+    var yaml = SettingsYaml.fromString(content: content, filePath: path);
+    expect(yaml.asString('string'), equals('slayer'));
+    expect(yaml.asInt('int'), equals(10));
+    expect(yaml.asDouble('double'), equals(10.1));
+    expect(yaml.asBool('bool'), isTrue);
+  });
+
   test('SettingsYaml String list', () async {
     var content = '''name: brett
 hostnames: [one, two, three]

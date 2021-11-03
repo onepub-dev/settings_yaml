@@ -37,8 +37,17 @@ void load() {
   var ats = settings['ats']; // List<dynamic>
 
   List<String> atsAsString = yaml.asStringList['ats'];
-
   var hosts = settings['hosts'] as Map<String, String>;
+
+  settings['a_String'] = 'hello world';
+  settings['an_int'] = 10;
+  settings['a_double'] = 10.0;
+  settings['a_bool'] = true;
+
+  var a_String = settings.asString('a_String');
+  var an_int = settings.asInt('an_int');
+  var a_double = settings.asDoule('a_double');
+  var a_bool = settings.asBool('a_bool');
 
 
   print('dbname $dbname, username: $username, password: $password, timeout: $timeout');
