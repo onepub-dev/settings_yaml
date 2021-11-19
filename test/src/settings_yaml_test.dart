@@ -295,4 +295,85 @@ imageid: "65385002e970"
     yaml = SettingsYaml.load(pathToSettings: path);
     expect(yaml.validString('imageid'), equals(true));
   });
+
+  test('selectors -- good', () {
+    var path = '/tmp/settings.yaml';
+
+    var content = '''name: brett
+hostname: slayer
+port: 10
+active: true
+volume: 10.0
+imageid: "65385002e970"
+people:
+  - person:
+    name: brett
+  - person:
+    name: john
+''';
+
+    var settings = SettingsYaml.fromString(content: content, filePath: path);
+    expect(settings.selectAsString('hostname'), equals('slayer'));
+    expect(settings.selectAsString('imageid'), equals('65385002e970'));
+    expect(settings.selectAsDouble('volume'), equals(10.0));
+    expect(settings.selectAsBool('active'), isTrue);
+    expect(settings.selectAsString('people.person[0].name'), equals('brett'));
+    expect(settings.selectAsString('people.person[1].name'), equals('john'));
+
+    final t1 = settings.selectAsList('people');
+    expect(t1.length, equals(2));
+    expect(t1[0]['name'], equals('brett'));
+    expect(t1[1]['name'], equals('john'));
+    // expect(
+    //     t1,
+    //     orderedEquals([
+    //       {'person': null, 'name': 'brett'},
+    //       {'person': null, 'name': 'john'}
+    //     ]));
+    final t2 = settings.selectAsMap('people.person[1]');
+
+    expect(t2.length, equals(2));
+    expect(t2['name'], equals('john'));
+  });
+
+  test('selectors -- bad', () {
+    var path = '/tmp/settings.yaml';
+
+    var content = '''name: brett
+hostname: slayer
+port: 10
+active: true
+volume: 10.0
+imageid: "65385002e970"
+people:
+  - person:
+    name: brett
+  - person:
+    name: john
+''';
+
+    var settings = SettingsYaml.fromString(content: content, filePath: path);
+
+    expect(() => settings.selectAsString('bad.path'),
+        throwsA(isA<SettingsYamlException>()));
+    expect(
+        () => settings.selectAsString('bad.path'),
+        throwsA((e) =>
+            e is SettingsYamlException && e.message == 'Invalid path: bad'));
+
+    expect(
+        () => settings.selectAsString('people.bad'),
+        throwsA((e) =>
+            e is SettingsYamlException &&
+            e.message ==
+                'As people is a list expected people.bad to be a list index. e.g people.bad[i]'));
+
+    expect(
+        () => settings.selectAsString('people.bad[0]'),
+        throwsA((e) =>
+            e is SettingsYamlException &&
+            e.message ==
+                'Expected a index selector of people.person[0]. Found people.bad[0]'));
+
+  });
 }

@@ -3,6 +3,9 @@ import 'dart:io';
 import 'package:path/path.dart';
 import 'package:settings_yaml/src/util/file_util.dart';
 import 'package:yaml/yaml.dart';
+import 'yaml_map_extension.dart';
+
+import 'yaml.dart';
 
 class SettingsYaml {
   YamlDocument? _document;
@@ -235,35 +238,103 @@ class SettingsYaml {
   dynamic _normalizedValue(String path) {
     var value = valueMap[path];
 
-    return _convertNode(value);
+    return convertNode(value);
   }
 
-  dynamic _convertNode(dynamic value) {
-    if (value is YamlList) return _toList(value);
-
-    if (value is YamlMap) return _toMap(value);
-
-    return value;
+  String selectAsString(String _path) {
+    return traverse(_path);
   }
 
-  List<dynamic> _toList(YamlList yamlList) {
-    var list = <dynamic>[];
-    for (var e in yamlList) {
-      list.add(_convertNode(e));
-    }
-    return list;
+  int selectAsInt(String _path) {
+    return traverse(_path) as int;
   }
 
-  Map<String, dynamic> _toMap(YamlMap yamlMap) {
-    var map = <String, dynamic>{};
-    yamlMap.forEach((k, v) {
-      if (k is YamlScalar) {
-        map[(k).value.toString()] = _convertNode(v);
+  double selectAsDouble(String selector) {
+    return traverse(selector) as double;
+  }
+
+  bool selectAsBool(String selector) {
+    return traverse(selector) as bool;
+  }
+
+  List<dynamic> selectAsList(String _path) {
+    return (traverse(_path) as YamlList).toList();
+  }
+
+  Map<String, dynamic> selectAsMap(String _path) {
+    return (traverse(_path) as YamlMap).toMap();
+  }
+
+  /// Each selector is made up of a word.
+  /// To access a list use 'word[n]'
+  /// where 'n' is the nth instance of the word
+  /// in a yaml array.
+  /// e.g.
+  /// ```
+  /// one:
+  ///   - two
+  ///   - two
+  ///     three:
+  ///       four: value
+  /// ```
+  /// To return the value of four
+  /// ```dart
+  /// traverse('one.two[1].three.four') == 'value'
+  /// ```
+  /// Regex to extract the index from an array selector of the form
+  /// 'word[n]'
+  static late final _indexRegx = RegExp(r'^(\w*)\[([0-9]*)\]$');
+  dynamic traverse(String selector) {
+    var parts = selector.split('.');
+    var remaining = parts.length;
+
+    var current = _document?.contents.value;
+    String traversed = '';
+    String previousTraversed = '';
+    for (final part in parts) {
+      previousTraversed = traversed;
+      if (traversed.isNotEmpty) {
+        traversed += '.$part';
       } else {
-        map[k.toString()] = _convertNode(v);
+        traversed += part;
       }
-    });
-    return map;
+
+      if (remaining > 0) {
+        if (part.contains('[')) {
+          /// we have a list selector of the form 'attribute[n]'
+          if (current is! YamlList) {
+            throw SettingsYamlException('Expected a map at $traversed');
+          }
+
+          final matches = _indexRegx.allMatches(part);
+          if (matches.length != 1) {
+            throw SettingsYamlException(
+                'Expected a index selector e.g. people[1] in $part at $traversed');
+          }
+
+          final key = matches.first.group(1);
+          final index = int.parse(matches.first.group(2)!);
+          current = (current)[index];
+
+          if (current.keys.first != key) {
+            throw SettingsYamlException(
+                'Expected a index selector of $previousTraversed.${current.keys.first}[$index]. Found $previousTraversed.$key[$index]');
+          }
+        } else {
+          if (current is! YamlMap) {
+            throw SettingsYamlException(
+                'As $previousTraversed is a list expected $traversed to be a list index. e.g $traversed[i]');
+          }
+          current = current[part];
+          if (current == null) {
+            throw SettingsYamlException("Invalid path: $traversed");
+          }
+        }
+
+        remaining--;
+      }
+    }
+    return current;
   }
 }
 

@@ -1,6 +1,6 @@
-Provide a very simple method to use yaml files for saving an apps configuration.
+Provide a very simple method to use yaml files for reading/writing an app's configuration.
 
-Saving config data:
+# Saving a config data
 
 ```dart
 void save() {
@@ -22,7 +22,7 @@ void save() {
 }
 ```
 
-Loading config data.
+# Loading config data
 
 ```dart
 void load() {
@@ -65,3 +65,25 @@ void load() {
 }
 ```
 
+# Access nested content
+
+SettingsYaml also provides access to nested attributes using path selectors:
+
+```dart
+ var content = '''name: brett
+hostname: slayer
+port: 10
+active: true
+volume: 10.0
+imageid: "65385002e970"
+people:
+  - person:
+    name: brett
+  - person:
+    name: john
+''';
+
+    var settings = SettingsYaml.fromString(content: content, filePath: path);
+    expect(settings.selectAsString('people.person[0].name'), equals('brett'));
+    expect(settings.selectAsString('people.person[1].name'), equals('john'));
+```    
