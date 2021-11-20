@@ -241,27 +241,69 @@ class SettingsYaml {
     return convertNode(value);
   }
 
-  String selectAsString(String _path) {
+  /// Returns the String attribute at [selector]
+  /// See [traverse] for details on the syntax of [selector]
+  /// Throws a [SettingsYamlException] if
+  /// an error occurs reading the selector
+  /// Throws a [PathNotFoundException] exception
+  /// If the selector doesn't lead to a valid
+  /// location.
+  String? selectAsString(String _path) {
     return traverse(_path);
   }
 
-  int selectAsInt(String _path) {
+  /// Returns the int attribute at [selector]
+  /// See [traverse] for details on the syntax of [selector]
+  /// Throws a [SettingsYamlException] if
+  /// an error occurs reading the selector
+  /// Throws a [PathNotFoundException] exception
+  /// If the selector doesn't lead to a valid
+  /// location.
+  int? selectAsInt(String _path) {
     return traverse(_path) as int;
   }
 
-  double selectAsDouble(String selector) {
+  /// Returns the double attribute at [selector]
+  /// See [traverse] for details on the syntax of [selector]
+  /// Throws a [SettingsYamlException] if
+  /// an error occurs reading the selector
+  /// Throws a [PathNotFoundException] exception
+  /// If the selector doesn't lead to a valid
+  /// location.
+  double? selectAsDouble(String selector) {
     return traverse(selector) as double;
   }
 
-  bool selectAsBool(String selector) {
+  /// Returns the boolean attribute at [selector]
+  /// See [traverse] for details on the syntax of [selector]
+  /// Throws a [SettingsYamlException] if
+  /// an error occurs reading the selector
+  /// Throws a [PathNotFoundException] exception
+  /// If the selector doesn't lead to a valid
+  /// location.
+  bool? selectAsBool(String selector) {
     return traverse(selector) as bool;
   }
 
-  List<dynamic> selectAsList(String _path) {
+  /// Returns the list  at [selector]
+  /// See [traverse] for details on the syntax of [selector]
+  /// Throws a [SettingsYamlException] if
+  /// an error occurs reading the selector
+  /// Throws a [PathNotFoundException] exception
+  /// If the selector doesn't lead to a valid
+  /// location.
+  List<dynamic>? selectAsList(String _path) {
     return (traverse(_path) as YamlList).toList();
   }
 
-  Map<String, dynamic> selectAsMap(String _path) {
+  /// Returns the map at [selector]
+  /// See [traverse] for details on the syntax of [selector]
+  /// Throws a [SettingsYamlException] if
+  /// an error occurs reading the selector
+  /// Throws a [PathNotFoundException] exception
+  /// If the selector doesn't lead to a valid
+  /// location.
+  Map<String, dynamic>? selectAsMap(String _path) {
     return (traverse(_path) as YamlMap).toMap();
   }
 
@@ -284,7 +326,7 @@ class SettingsYaml {
   /// Regex to extract the index from an array selector of the form
   /// 'word[n]'
   static late final _indexRegx = RegExp(r'^(\w*)\[([0-9]*)\]$');
-  dynamic traverse(String selector) {
+  dynamic? traverse(String selector) {
     var parts = selector.split('.');
     var remaining = parts.length;
 
@@ -327,7 +369,7 @@ class SettingsYaml {
           }
           current = current[part];
           if (current == null) {
-            throw SettingsYamlException("Invalid path: $traversed");
+            throw PathNotFoundException("Invalid path: $traversed");
           }
         }
 
@@ -341,6 +383,14 @@ class SettingsYaml {
 class SettingsYamlException implements Exception {
   String message;
   SettingsYamlException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+class PathNotFoundException implements SettingsYamlException {
+  String message;
+  PathNotFoundException(this.message);
 
   @override
   String toString() => message;
