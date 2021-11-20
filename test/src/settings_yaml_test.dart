@@ -321,7 +321,7 @@ people:
     expect(settings.selectAsString('people.person[1].name'), equals('john'));
 
     final t1 = settings.selectAsList('people');
-    expect(t1.length, equals(2));
+    expect(t1!.length, equals(2));
     expect(t1[0]['name'], equals('brett'));
     expect(t1[1]['name'], equals('john'));
     // expect(
@@ -332,7 +332,7 @@ people:
     //     ]));
     final t2 = settings.selectAsMap('people.person[1]');
 
-    expect(t2.length, equals(2));
+    expect(t2!.length, equals(2));
     expect(t2['name'], equals('john'));
   });
 
@@ -374,6 +374,5 @@ people:
             e is SettingsYamlException &&
             e.message ==
                 'Expected a index selector of people.person[0]. Found people.bad[0]'));
-
   });
 }
