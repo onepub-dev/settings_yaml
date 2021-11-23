@@ -1,3 +1,6 @@
+# 3.3.1
+- updated the readme with some additional examples.
+
 # 3.3.0
 - Added ability to read a yaml attribute via a selection path. e.g. 'dependencies.dcli.path'
 

@@ -101,13 +101,24 @@ one:
   - two
   - two
     three:
-      four: value
+      name: brett
+      password: abc123
+
 ```
 
 To return the value of four
 
 ```dart
-traverse('one.two[1].three.four') == 'value'
+settings.selectAsString('one.two[1].three.name') == 'brett'
+settings.selectAsString('one.two[1].three.password') == 'abc123'
 ```
-Regex to extract the index from an array selector of the form
-'word[n]'
+
+You can also get a Dart map or list:
+
+```dart
+settings.selectAsString('one.two[1].three') is Map;
+settings.selectAsString('one')  is List;
+```
+
+
+
