@@ -84,6 +84,7 @@ people:
 ''';
 
     var settings = SettingsYaml.fromString(content: content, filePath: path);
+    // use a path selector to read an attribute.
     expect(settings.selectAsString('people.person[0].name'), equals('brett'));
     expect(settings.selectAsString('people.person[1].name'), equals('john'));
 ```    
