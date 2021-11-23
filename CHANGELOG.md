@@ -1,3 +1,6 @@
+# 3.3.0
+- Added ability to read a yaml attribute via a selection path. e.g. 'dependencies.dcli.path'
+
 # 3.2.0
 - Added defaults to each of the 'as' methods to make it easier to handle settings file that are empty.
 
