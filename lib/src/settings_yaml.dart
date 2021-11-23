@@ -7,6 +7,53 @@ import 'yaml_map_extension.dart';
 
 import 'yaml.dart';
 
+/// Provides the ability to read/write simply settings stored in a yaml file
+/// without having to worry about parsing the yaml file or programatically
+/// traversing the yaml tree.
+///
+/// ```yaml
+/// password: xxxx
+/// user: xxxx
+/// '''
+///
+/// To obtain the value of password use:
+/// ```dart
+/// final settings = SettingsYaml.load(pathToSettings: 'path to yaml.yaml');
+/// final password = settings.asString['password'];
+/// ```
+///
+/// You can also update an entry:
+///
+/// ```dart
+/// settings['password'] = 'abc123';
+/// settings.save();
+/// ```
+///
+/// You can also read attributes stored in a classic yaml hierachy using
+/// selectors similar to html xpath selectors.
+///
+/// A selector path is made of words seperated by periods.
+/// e.g.
+/// environment.sdk
+///
+/// You can also craft a selector to access a specific element in
+/// a yaml list using the '[]' operators.
+///
+/// To access a list use 'word[n]' where 'n' is the nth instance of the word
+/// in a yaml array.
+///
+/// e.g.
+/// ```
+/// one:
+///   - two
+///   - two
+///     three:
+///       four: value
+/// ```
+/// To return the value of four
+/// ```dart
+/// traverse('one.two[1].three.four') == 'value'
+/// ```
 class SettingsYaml {
   YamlDocument? _document;
   String filePath;
@@ -337,22 +384,6 @@ class SettingsYaml {
     return (map).toMap();
   }
 
-  /// Each selector is made up of a word.
-  /// To access a list use 'word[n]'
-  /// where 'n' is the nth instance of the word
-  /// in a yaml array.
-  /// e.g.
-  /// ```
-  /// one:
-  ///   - two
-  ///   - two
-  ///     three:
-  ///       four: value
-  /// ```
-  /// To return the value of four
-  /// ```dart
-  /// traverse('one.two[1].three.four') == 'value'
-  /// ```
   /// Regex to extract the index from an array selector of the form
   /// 'word[n]'
   static late final _indexRegx = RegExp(r'^(\w*)\[([0-9]*)\]$');
