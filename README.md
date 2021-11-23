@@ -88,3 +88,26 @@ people:
     expect(settings.selectAsString('people.person[0].name'), equals('brett'));
     expect(settings.selectAsString('people.person[1].name'), equals('john'));
 ```    
+
+Each selector is made up of a word.
+
+To access an element in a list use 'word[n]'.
+where 'n' is the nth instance of the word in a yaml array.
+
+
+e.g.
+```
+one:
+  - two
+  - two
+    three:
+      four: value
+```
+
+To return the value of four
+
+```dart
+traverse('one.two[1].three.four') == 'value'
+```
+Regex to extract the index from an array selector of the form
+'word[n]'
