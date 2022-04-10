@@ -7,7 +7,7 @@ void main() {
 }
 
 void save() {
-  var settings = SettingsYaml.load(pathToSettings: '.settings.yaml');
+  final settings = SettingsYaml.load(pathToSettings: '.settings.yaml');
 
   settings['dbname'] = 'billing';
   settings['dbusername'] = 'username';
@@ -20,25 +20,25 @@ void save() {
 }
 
 void load() {
-  var settings = SettingsYaml.load(pathToSettings: '.settings.yaml');
+  final settings = SettingsYaml.load(pathToSettings: '.settings.yaml');
 
-  assert(settings.validString('dbname'));
-  assert(settings.validInt('timeout'));
-  assert(settings.validDouble('coefficient'));
-  assert(settings.validBool('active'));
+  assert(settings.validString('dbname'), 'Should be a string');
+  assert(settings.validInt('timeout'), 'Should be an int');
+  assert(settings.validDouble('coefficient'), 'Should be a double');
+  assert(settings.validBool('active'), 'Should be a bool');
 
-  var dbname = settings['dbname'] as String;
+  final dbname = settings['dbname'] as String;
   // we haven't validated the dbusername and dbpassword so
   // they could be null.
-  var username = settings['dbusername'] as String?;
-  var password = settings['dbpassword'] as String?;
-  
-  var timeout = settings['timeout'] as int;
-  var coefficient = settings['coefficient'] as double;
-  var active = settings['active'] as bool;
+  final username = settings['dbusername'] as String?;
+  final password = settings['dbpassword'] as String?;
 
-  print(
-      'dbname $dbname, username: $username, password: $password, timeout: $timeout, coefficient: $coefficient, active: $active');
+  final timeout = settings['timeout'] as int;
+  final coefficient = settings['coefficient'] as double;
+  final active = settings['active'] as bool;
+
+  print('dbname $dbname, username: $username, password: $password, '
+      'timeout: $timeout, coefficient: $coefficient, active: $active');
 
   settings.save();
 }
