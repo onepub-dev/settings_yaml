@@ -1,3 +1,6 @@
+# 3.4.0
+- removed local file utils code and move to using dcli_core and its associated improved errors. moved to lint_hard and cleaned up found errors.
+
 # 3.3.1
 - updated the readme with some additional examples.
 

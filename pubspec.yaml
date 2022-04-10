@@ -1,5 +1,5 @@
 name: settings_yaml
-version: 3.3.1
+version: 3.4.0
 homepage: https://github.com/bsutton/settings_yaml
 description: Provides a simple means of saving/loading settings from a yaml file without the yaml fuss.
 environment: 
@@ -15,9 +15,3 @@ dev_dependencies:
   dcli: ^1.20.1
   lint_hard: ^1.0.0
   test: ^1.16.2
-
-# dependency_overrides:
-#   dcli:
-#     path: ../dcli/dcli
-#   dcli_core:
-#     path: ../dcli/dcli_core
