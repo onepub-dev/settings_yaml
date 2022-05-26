@@ -1,3 +1,6 @@
+# 3.4.1
+Fixed a bug for the save method on Windows as it was trying to move the settings file whilst it still had it open.
+
 # 3.4.0
 - removed local file utils code and move to using dcli_core and its associated improved errors. moved to lint_hard and cleaned up found errors.
 

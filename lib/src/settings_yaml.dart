@@ -188,20 +188,20 @@ class SettingsYaml {
           await file.append('${pair.key}: ${pair.value}');
         }
       }
-
-      /// Do a safe save.
-      final back = '$filePath.bak';
-      if (exists(back)) {
-        await delete(back);
-      }
-      if (exists(filePath)) {
-        await move(filePath, back);
-      }
-      await move(tmp, filePath);
-      if (exists(back)) {
-        await delete(back);
-      }
     });
+
+    /// Do a safe save.
+    final back = '$filePath.bak';
+    if (exists(back)) {
+      await delete(back);
+    }
+    if (exists(filePath)) {
+      await move(filePath, back);
+    }
+    await move(tmp, filePath);
+    if (exists(back)) {
+      await delete(back);
+    }
   }
 
   /// Returns the value for the given key.
