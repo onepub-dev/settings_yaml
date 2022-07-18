@@ -1,3 +1,6 @@
+# 3.4.2
+- Fixed a bug when setting a value you couldn't retrieve the same value with out saving/reloading.
+
 # 3.4.1
 Fixed a bug for the save method on Windows as it was trying to move the settings file whilst it still had it open.
 

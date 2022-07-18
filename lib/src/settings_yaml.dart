@@ -265,33 +265,33 @@ class SettingsYaml {
   /// Returns true if the key has a value which is a
   /// String which is non-null and not empty
   bool validString(String key) {
-    final dynamic value = _document?.contents.value[key];
+    final dynamic value = valueMap[key];
     return value != null && value is String && value.isNotEmpty;
   }
 
   bool validStringList(String key) {
-    final dynamic value = _document?.contents.value[key];
+    final dynamic value = valueMap[key];
     return value != null && value is List<dynamic> && value.isNotEmpty;
   }
 
   /// Returns true if the key has a value which is an
   /// int. Empty or null value returns false.
   bool validInt(String key) {
-    final dynamic value = _document?.contents.value[key];
+    final dynamic value = valueMap[key];
     return value != null && value is int;
   }
 
   /// Returns true if the key has a value which is a
   /// double. Empty or null value returns false.
   bool validDouble(String key) {
-    final dynamic value = _document?.contents.value[key];
+    final dynamic value = valueMap[key];
     return value != null && value is double;
   }
 
   /// Returns true if the key has a value which is a
   /// bool. Empty or null value returns false.
   bool validBool(String key) {
-    final dynamic value = _document?.contents.value[key];
+    final dynamic value = valueMap[key];
     return value != null && value is bool;
   }
 

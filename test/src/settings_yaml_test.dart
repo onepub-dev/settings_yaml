@@ -40,6 +40,28 @@ bool: true
     expect(yaml.asBool('bool'), isTrue);
   });
 
+  test('add/retrieve', () async {
+    const content = '''
+name: brett
+string: slayer
+int: 10
+double: 10.1
+bool: true
+''';
+
+    await core.withTempFile((path) async {
+      const path = '/tmp/settings.yaml';
+      final yaml = SettingsYaml.fromString(content: content, filePath: path);
+      yaml['sex'] = 'male';
+      expect(yaml.asString('sex'), equals('male'));
+
+      await yaml.save();
+      SettingsYaml.load(pathToSettings: path);
+      expect(yaml.asString('name'), equals('brett'));
+      expect(yaml.asString('sex'), equals('male'));
+    });
+  });
+
   test('SettingsYaml String list', () async {
     core.Settings().setVerbose(enabled: true);
     const content = '''
