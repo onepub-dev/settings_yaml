@@ -400,7 +400,7 @@ class SettingsYaml {
   /// Regex to extract the index from an array selector of the form
   // ignore: comment_references
   /// 'word[n]'
-  static late final _indexRegx = RegExp(r'^(\w*)\[([0-9]*)\]$');
+  static final _indexRegx = RegExp(r'^(\w*)\[([0-9]*)\]$');
   dynamic traverse(String selector) {
     final parts = selector.split('.');
     var remaining = parts.length;

@@ -6,13 +6,13 @@
 
 import 'package:settings_yaml/settings_yaml.dart';
 
-void main() {
-  save();
+Future<void> main() async {
+  await save();
 
-  load();
+  await load();
 }
 
-void save() {
+Future<void> save() async {
   final settings = SettingsYaml.load(pathToSettings: '.settings.yaml');
 
   settings['dbname'] = 'billing';
@@ -22,10 +22,10 @@ void save() {
   settings['coefficient'] = 10.85;
   settings['active'] = true;
 
-  settings.save();
+  await settings.save();
 }
 
-void load() {
+Future<void> load() async {
   final settings = SettingsYaml.load(pathToSettings: '.settings.yaml');
 
   assert(settings.validString('dbname'), 'Should be a string');
@@ -46,5 +46,5 @@ void load() {
   print('dbname $dbname, username: $username, password: $password, '
       'timeout: $timeout, coefficient: $coefficient, active: $active');
 
-  settings.save();
+  await settings.save();
 }
