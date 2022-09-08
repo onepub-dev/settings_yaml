@@ -1,8 +1,10 @@
+# 5.0.0-beta.1
+- updated to dcli_core 2.0.0 and dart 2.18
 # 4.0.0
-- moved to dcli 1.34 and dart 2.16.
+- moved to dcli_core 1.34 and dart 2.16.
 
 # 3.5.0
-- upgraded to dcli 1.20.2 which has fixed for running under dart 2.12.
+- upgraded to dcli_core 1.20.2 which has fixed for running under dart 2.12.
 - cleaned up lint warnings.
 
 # 3.4.2
