@@ -1,3 +1,7 @@
+# 3.5.0
+- upgraded to dcli 1.20.2 which has fixed for running under dart 2.12.
+- cleaned up lint warnings.
+
 # 3.4.2
 - Fixed a bug when setting a value you couldn't retrieve the same value with out saving/reloading.
 
