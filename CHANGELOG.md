@@ -1,3 +1,6 @@
+# 4.0.0
+- moved to dcli 1.34 and dart 2.16.
+
 # 3.5.0
 - upgraded to dcli 1.20.2 which has fixed for running under dart 2.12.
 - cleaned up lint warnings.
