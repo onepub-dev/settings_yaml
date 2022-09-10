@@ -1,3 +1,6 @@
+# 5.0.0-beta.2
+- Added new method selectorExists to check if a path selector is valid.
+
 # 5.0.0-beta.1
 - updated to dcli_core 2.0.0 and dart 2.18
 # 4.0.0

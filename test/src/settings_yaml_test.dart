@@ -427,4 +427,25 @@ people:
                 'Expected a index selector of people.person[0]. '
                     'Found people.bad[0]'));
   });
+
+  test('Invalid selector', () async {
+    const content = '''
+name: brett
+hostname: slayer
+port: 10
+''';
+    const path = '/tmp/settings.yaml';
+    final yaml = SettingsYaml.fromString(content: content, filePath: path);
+    expect(yaml['name'], equals('brett'));
+    expect(yaml['hostname'], equals('slayer'));
+    expect(yaml['port'], equals(10));
+
+    expect(yaml.selectorExists('port'), isTrue);
+    expect(yaml.selectorExists('fred'), isFalse);
+
+    expect(
+        () => yaml.selectAsString('people.bad[0]'),
+        throwsA((dynamic e) =>
+            e is PathNotFoundException && e.message == 'Invalid path: people'));
+  });
 }

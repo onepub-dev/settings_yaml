@@ -401,6 +401,19 @@ class SettingsYaml {
   // ignore: comment_references
   /// 'word[n]'
   static final _indexRegx = RegExp(r'^(\w*)\[([0-9]*)\]$');
+
+  /// Returns true if the given [selector] exists in the
+  /// settings file.
+  bool selectorExists(String selector) {
+    var valid = true;
+    try {
+      traverse(selector);
+    } on PathNotFoundException catch (_, __) {
+      valid = false;
+    }
+    return valid;
+  }
+
   dynamic traverse(String selector) {
     final parts = selector.split('.');
     var remaining = parts.length;
