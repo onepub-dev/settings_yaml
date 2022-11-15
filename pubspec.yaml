@@ -1,5 +1,5 @@
 name: settings_yaml
-version: 5.0.0-beta.2
+version: 5.0.0
 homepage: https://github.com/onepub-dev/settings_yaml
 description: Provides a simple means of saving/loading settings from a yaml file without the yaml fuss.
 environment: 
