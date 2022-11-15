@@ -1,3 +1,6 @@
+# 3.5.1
+- back ported selectorExists.
+
 # 3.5.0
 - upgraded to dcli 1.20.2 which has fixed for running under dart 2.12.
 - cleaned up lint warnings.
