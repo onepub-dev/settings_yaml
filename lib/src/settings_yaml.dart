@@ -397,6 +397,18 @@ class SettingsYaml {
     return map.toMap();
   }
 
+  /// Returns true if the given [selector] exists in the
+  /// settings file.
+  bool selectorExists(String selector) {
+    var valid = true;
+    try {
+      traverse(selector);
+    } on PathNotFoundException catch (_, __) {
+      valid = false;
+    }
+    return valid;
+  }
+
   /// Regex to extract the index from an array selector of the form
   // ignore: comment_references
   /// 'word[n]'

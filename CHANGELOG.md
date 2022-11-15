@@ -1,3 +1,6 @@
+# 4.0.1
+- back ported selectorExists.
+
 # 4.0.0
 - moved to dcli 1.34 and dart 2.16.
 
