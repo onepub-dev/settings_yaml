@@ -1,3 +1,7 @@
+# 6.0.0
+- upgraded to dart 3.x
+- Added new method selectorExists to check if a path selector is valid.
+
 # 3.5.1
 - back ported selectorExists.
 

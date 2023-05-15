@@ -63,7 +63,7 @@ bool: true
   });
 
   test('SettingsYaml String list', () async {
-    core.Settings().setVerbose(enabled: true);
+    await core.Settings().setVerbose(enabled: true);
     const content = '''
 name: brett
 hostnames: [one, two, three]
