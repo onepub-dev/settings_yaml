@@ -1,4 +1,4 @@
-# 7.0.1
+# 7.1.0
 - upgraded to dcli_core 3.0.7 and uuid 4.x
 
 # 7.0.0
