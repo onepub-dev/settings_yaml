@@ -1,9 +1,9 @@
 name: settings_yaml
-version: 6.1.0
+version: 7.0.0
 homepage: https://github.com/bsutton/settings_yaml
 description: Provides a simple means of saving/loading settings from a yaml file without the yaml fuss.
 environment: 
-  sdk: '>=2.19.0 <4.0.0'
+  sdk: '>=3.0.0 <4.0.0'
 dependencies: 
   collection: ^1.15.0
   dcli_core: ^3.0.7
