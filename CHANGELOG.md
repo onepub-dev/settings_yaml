@@ -1,3 +1,5 @@
+# 6.1.0
+- upgraded to dcli_core 3.0.7 and uuid 4.x
 # 6.0.0
 - upgraded to dart 3.x
 - Added new method selectorExists to check if a path selector is valid.
