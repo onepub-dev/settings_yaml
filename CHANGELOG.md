@@ -1,3 +1,9 @@
+# 8.0.0-alpha.2
+- Move Settings.Yaml.save back to async as the underlying dcli_core libraries
+demanded it.
+# 8.0.0
+Upgraded to dcli 4.x
+- BREAKING SettingsYaml.save is now synchronous.
 # 7.1.0
 - upgraded to dcli_core 3.0.7 and uuid 4.x
 

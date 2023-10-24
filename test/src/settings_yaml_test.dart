@@ -140,10 +140,10 @@ port: 10
 coefficient: 8.25
 ''';
     if (core.exists(path)) {
-      await core.delete(path);
+      core.delete(path);
     }
     await core.withOpenLineFile(path, (file) async {
-      await file.write(content);
+      file.write(content);
     });
 
     final yaml = SettingsYaml.load(pathToSettings: path);
@@ -161,15 +161,15 @@ hostname: slayer
 port: 10
 ''';
     if (core.exists(path)) {
-      await core.delete(path);
+      core.delete(path);
     }
 
     await core.withOpenLineFile(path, (file) async {
-      await file.write(content);
+      file.write(content);
     });
 
     var yaml = SettingsYaml.fromString(content: content, filePath: path);
-    await core.delete(path);
+    core.delete(path);
     await yaml.save();
 
     yaml = SettingsYaml.load(pathToSettings: path);
@@ -182,18 +182,17 @@ port: 10
     const path = '/tmp/settings.yaml';
 
     if (core.exists(path)) {
-      await core.delete(path);
+      core.delete(path);
     }
 
-    final yaml = SettingsYaml.load(pathToSettings: path);
-    await yaml.save();
+    await SettingsYaml.load(pathToSettings: path).save();
   });
 
   test('SettingsYaml load create with no file and save settings.', () async {
     const path = '/tmp/settings.yaml';
 
     if (core.exists(path)) {
-      await core.delete(path);
+      core.delete(path);
     }
 
     var yaml = SettingsYaml.load(pathToSettings: path);
@@ -335,7 +334,6 @@ imageid: "65385002e970"
 ''';
 
     var yaml = SettingsYaml.fromString(content: content, filePath: path);
-
     await yaml.save();
 
     yaml = SettingsYaml.load(pathToSettings: path);
