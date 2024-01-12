@@ -1,3 +1,8 @@
+# 8.0.0-alpha.3
+- FIXES: #3 Fixed a bug in the save method that caused it to fail when the temp
+file was on a different device. 
+The problem was caused by a bug in dcli_core.
+
 # 8.0.0-alpha.2
 - Move Settings.Yaml.save back to async as the underlying dcli_core libraries
 demanded it.
