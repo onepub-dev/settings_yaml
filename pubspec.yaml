@@ -1,7 +1,6 @@
 name: settings_yaml
 version: 8.0.0-alpha.3
 homepage: https://github.com/bsutton/settings_yaml
-publish_to: https://onepub.dev/api/jbbxpsdavu/
 description: Provides a simple means of saving/loading settings from a yaml file without the yaml fuss.
 environment: 
   sdk: '>=3.0.0 <4.0.0'
