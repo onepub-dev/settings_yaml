@@ -1,3 +1,6 @@
+# 8.0.1
+- #3 wasn't actually fixed. It should now be.
+
 # 8.0.0-alpha.3
 - FIXES: #3 Fixed a bug in the save method that caused it to fail when the temp
 file was on a different device. 
