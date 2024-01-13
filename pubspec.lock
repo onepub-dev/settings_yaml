@@ -85,18 +85,10 @@ packages:
     dependency: "direct main"
     description:
       name: dcli_core
-      sha256: "9bbcdb8482162dbcc2d53070f592dde1e42119c5e323c7d592adb3e7096da865"
+      sha256: "48dd685637ba54df7f51742c148b59853fe86b6415424303ec4b67b50e5dbd47"
       url: "https://pub.dev"
     source: hosted
-    version: "4.0.1-alpha.2"
-  ffi:
-    dependency: transitive
-    description:
-      name: ffi
-      sha256: "7bf0adc28a23d395f19f3f1eb21dd7cfd1dd9f8e1c50051c069122e6853bc878"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.1.0"
+    version: "3.2.8"
   file:
     dependency: transitive
     description:

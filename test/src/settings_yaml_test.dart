@@ -140,10 +140,10 @@ port: 10
 coefficient: 8.25
 ''';
     if (core.exists(path)) {
-      core.delete(path);
+      await core.delete(path);
     }
     await core.withOpenLineFile(path, (file) async {
-      file.write(content);
+      await file.write(content);
     });
 
     final yaml = SettingsYaml.load(pathToSettings: path);
@@ -161,15 +161,15 @@ hostname: slayer
 port: 10
 ''';
     if (core.exists(path)) {
-      core.delete(path);
+      await core.delete(path);
     }
 
     await core.withOpenLineFile(path, (file) async {
-      file.write(content);
+      await file.write(content);
     });
 
     var yaml = SettingsYaml.fromString(content: content, filePath: path);
-    core.delete(path);
+    await core.delete(path);
     await yaml.save();
 
     yaml = SettingsYaml.load(pathToSettings: path);
@@ -182,7 +182,7 @@ port: 10
     const path = '/tmp/settings.yaml';
 
     if (core.exists(path)) {
-      core.delete(path);
+      await core.delete(path);
     }
 
     await SettingsYaml.load(pathToSettings: path).save();
@@ -192,7 +192,7 @@ port: 10
     const path = '/tmp/settings.yaml';
 
     if (core.exists(path)) {
-      core.delete(path);
+      await core.delete(path);
     }
 
     var yaml = SettingsYaml.load(pathToSettings: path);

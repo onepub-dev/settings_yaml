@@ -183,15 +183,15 @@ class SettingsYaml {
     final tmp = createTempFilename();
 
     await withOpenLineFile(tmp, (file) async {
-      file.write('# SettingsYaml settings file');
+      await file.write('# SettingsYaml settings file');
 
       for (final pair in valueMap.entries) {
         if (pair.value is String) {
           /// quote the string to ensure it doesn't get interpreted
           /// as a num/bool etc and import.
-          file.append('${pair.key}: "${pair.value}"');
+          await file.append('${pair.key}: "${pair.value}"');
         } else {
-          file.append('${pair.key}: ${pair.value}');
+          await file.append('${pair.key}: ${pair.value}');
         }
       }
     });
@@ -199,14 +199,14 @@ class SettingsYaml {
     /// Do a safe save.
     final back = '$filePath.bak';
     if (exists(back)) {
-      delete(back);
+      await delete(back);
     }
     if (exists(filePath)) {
-      move(filePath, back);
+      await move(filePath, back);
     }
-    move(tmp, filePath);
+    await move(tmp, filePath);
     if (exists(back)) {
-      delete(back);
+      await delete(back);
     }
   }
 
