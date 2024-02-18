@@ -1,3 +1,6 @@
+# 8.1.0-alpha.1
+- upgraded to dcli_core 4.0.0-alpha.1
+
 # 8.0.1
 - #3 wasn't actually fixed. It should now be.
 
