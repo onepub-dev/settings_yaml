@@ -204,7 +204,12 @@ class SettingsYaml {
     if (exists(filePath)) {
       await move(filePath, back);
     }
-    await move(tmp, filePath);
+    //Fix The system cannot move files to a different disk drive.
+    await copy(tmp, filePath);
+    if (exists(tmp)) {
+      await delete(tmp);
+    }
+   // await move(tmp, filePath);
     if (exists(back)) {
       await delete(back);
     }
