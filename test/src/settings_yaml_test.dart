@@ -49,7 +49,7 @@ double: 10.1
 bool: true
 ''';
 
-    await core.withTempFile((path) async {
+    await core.withTempFileAsync((path) async {
       const path = '/tmp/settings.yaml';
       final yaml = SettingsYaml.fromString(content: content, filePath: path);
       yaml['sex'] = 'male';
@@ -72,7 +72,7 @@ hostnames: [one, two, three]
     final yaml = SettingsYaml.fromString(content: content, filePath: path);
     expect(yaml['hostnames'], equals(['one', 'two', 'three']));
 
-    await core.withTempFile((pathTo) async {
+    await core.withTempFileAsync((pathTo) async {
       var yaml = SettingsYaml.load(pathToSettings: pathTo);
       yaml['list'] = <String>['one', 'two', 'three'];
       await yaml.save();
@@ -105,7 +105,7 @@ hostnames:
             {'host1': 'one', 'host2': 'two', 'host3': 'three'}),
         isTrue);
 
-    await core.withTempFile((pathTo) async {
+    await core.withTempFileAsync((pathTo) async {
       var yaml = SettingsYaml.load(pathToSettings: pathTo);
       yaml['map'] = <String, String>{
         'host1': 'one',
