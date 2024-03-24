@@ -1,3 +1,6 @@
+# 8.1.0-alpha.2
+- upgraded to dcli_core 4.0.0-alpha.11
+
 # 8.1.0-alpha.1
 - upgraded to dcli_core 4.0.0-alpha.1
 
