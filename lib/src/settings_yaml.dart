@@ -8,10 +8,15 @@
 
 import 'dart:io';
 
-import 'package:dcli_core/dcli_core.dart';
 import 'package:path/path.dart';
 import 'package:yaml/yaml.dart';
 
+import 'util/delete.dart';
+import 'util/file.dart';
+import 'util/is.dart';
+import 'util/line_file.dart';
+import 'util/move.dart';
+import 'util/truepath.dart';
 import 'yaml.dart';
 import 'yaml_map_extension.dart';
 

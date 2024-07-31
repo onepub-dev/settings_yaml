@@ -1,3 +1,7 @@
+# 8.2.0
+- removed the dependency on dcli_core to break the circular dependencies.
+  this required copying a number of functions from the dcli_core pacakge.
+
 # 8.1.0-alpha.2
 - upgraded to dcli_core 4.0.0-alpha.11
 

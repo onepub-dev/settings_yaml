@@ -6,8 +6,11 @@
 
 import 'package:collection/collection.dart';
 // import 'package:dcli/dcli.dart' hide equals;
-import 'package:dcli_core/dcli_core.dart' as core;
 import 'package:settings_yaml/settings_yaml.dart';
+import 'package:settings_yaml/src/util/delete.dart';
+import 'package:settings_yaml/src/util/file.dart';
+import 'package:settings_yaml/src/util/is.dart';
+import 'package:settings_yaml/src/util/line_file.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -49,7 +52,7 @@ double: 10.1
 bool: true
 ''';
 
-    await core.withTempFileAsync((path) async {
+    await withTempFileAsync((path) async {
       const path = '/tmp/settings.yaml';
       final yaml = SettingsYaml.fromString(content: content, filePath: path);
       yaml['sex'] = 'male';
@@ -63,7 +66,6 @@ bool: true
   });
 
   test('SettingsYaml String list', () async {
-    await core.Settings().setVerbose(enabled: true);
     const content = '''
 name: brett
 hostnames: [one, two, three]
@@ -72,7 +74,7 @@ hostnames: [one, two, three]
     final yaml = SettingsYaml.fromString(content: content, filePath: path);
     expect(yaml['hostnames'], equals(['one', 'two', 'three']));
 
-    await core.withTempFileAsync((pathTo) async {
+    await withTempFileAsync((pathTo) async {
       var yaml = SettingsYaml.load(pathToSettings: pathTo);
       yaml['list'] = <String>['one', 'two', 'three'];
       await yaml.save();
@@ -105,7 +107,7 @@ hostnames:
             {'host1': 'one', 'host2': 'two', 'host3': 'three'}),
         isTrue);
 
-    await core.withTempFileAsync((pathTo) async {
+    await withTempFileAsync((pathTo) async {
       var yaml = SettingsYaml.load(pathToSettings: pathTo);
       yaml['map'] = <String, String>{
         'host1': 'one',
@@ -139,10 +141,10 @@ hostname: slayer
 port: 10
 coefficient: 8.25
 ''';
-    if (core.exists(path)) {
-      core.delete(path);
+    if (exists(path)) {
+      delete(path);
     }
-    await core.withOpenLineFile(path, (file) async {
+    await withOpenLineFile(path, (file) async {
       file.write(content);
     });
 
@@ -160,16 +162,16 @@ name: brett
 hostname: slayer
 port: 10
 ''';
-    if (core.exists(path)) {
-      core.delete(path);
+    if (exists(path)) {
+      delete(path);
     }
 
-    await core.withOpenLineFile(path, (file) async {
+    await withOpenLineFile(path, (file) async {
       file.write(content);
     });
 
     var yaml = SettingsYaml.fromString(content: content, filePath: path);
-    core.delete(path);
+    delete(path);
     await yaml.save();
 
     yaml = SettingsYaml.load(pathToSettings: path);
@@ -181,8 +183,8 @@ port: 10
   test('SettingsYaml load create with no file.', () async {
     const path = '/tmp/settings.yaml';
 
-    if (core.exists(path)) {
-      core.delete(path);
+    if (exists(path)) {
+      delete(path);
     }
 
     await SettingsYaml.load(pathToSettings: path).save();
@@ -191,8 +193,8 @@ port: 10
   test('SettingsYaml load create with no file and save settings.', () async {
     const path = '/tmp/settings.yaml';
 
-    if (core.exists(path)) {
-      core.delete(path);
+    if (exists(path)) {
+      delete(path);
     }
 
     var yaml = SettingsYaml.load(pathToSettings: path);

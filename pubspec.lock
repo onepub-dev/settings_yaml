@@ -46,14 +46,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.1"
-  circular_buffer:
-    dependency: transitive
-    description:
-      name: circular_buffer
-      sha256: "2889afcfc97aa0d9a4930ae5fdf206aea7d0ac88a3649acec9130565cd8f45d8"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.11.0"
   collection:
     dependency: "direct main"
     description:
@@ -86,30 +78,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.3"
-  dcli_common:
-    dependency: transitive
-    description:
-      name: dcli_common
-      sha256: aa61137f0e60817a6bc67f9ca0c709da222f9cef5bbfffb598051ac7c543557d
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.0.0"
-  dcli_core:
-    dependency: "direct main"
-    description:
-      name: dcli_core
-      sha256: d922658829d15a5c5726480b9848fa2916267148f4db6098597ca086e1dabe8a
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.0.0"
-  ffi:
-    dependency: transitive
-    description:
-      name: ffi
-      sha256: "493f37e7df1804778ff3a53bd691d8692ddf69702cf4c1c1096a2e41b4779e21"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.1.2"
   file:
     dependency: transitive
     description:
@@ -262,14 +230,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.4"
-  scope:
-    dependency: transitive
-    description:
-      name: scope
-      sha256: "80cf1cb727791fdaaa4131817974a6084815ed59b9ab02ef352c3a1badea488b"
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.1.0"
   shelf:
     dependency: transitive
     description:
@@ -402,10 +362,10 @@ packages:
     dependency: "direct main"
     description:
       name: uuid
-      sha256: "814e9e88f21a176ae1359149021870e87f7cddaf633ab678a5d2b0bff7fd1ba8"
+      sha256: "83d37c7ad7aaf9aa8e275490669535c8080377cfa7a7004c24dfac53afffaa90"
       url: "https://pub.dev"
     source: hosted
-    version: "4.4.0"
+    version: "4.4.2"
   vm_service:
     dependency: transitive
     description:
