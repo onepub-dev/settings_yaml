@@ -36,7 +36,7 @@ void load() {
   var timeout = settings['timeout']as String;
   var ats = settings['ats']; // List<dynamic>
 
-  List<String> atsAsString = yaml.asStringList['ats'];
+  List<String> atsAsString = settings.asStringList['ats'];
   var hosts = settings['hosts'] as Map<String, String>;
 
   settings['a_String'] = 'hello world';
@@ -116,8 +116,8 @@ settings.selectAsString('one.two[1].three.password') == 'abc123'
 You can also get a Dart map or list:
 
 ```dart
-settings.selectAsString('one.two[1].three') is Map;
-settings.selectAsString('one')  is List;
+settings.selectAsString('one.two[1].three') as Map;
+settings.selectAsString('one')  as List;
 ```
 
 

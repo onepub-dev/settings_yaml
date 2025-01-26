@@ -44,5 +44,5 @@ import 'truepath.dart';
   /// Thrown when the [delete] function encounters an error
 class DeleteException extends SettingsYamlException {
   /// Thrown when the [delete] function encounters an error
-  DeleteException(super.reason);
+  DeleteException(super.message);
 }

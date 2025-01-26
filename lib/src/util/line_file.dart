@@ -9,7 +9,6 @@ import 'dart:io';
 
 import 'platform.dart';
 
-
 /// Provide s collection of methods to make it easy
 /// to read/write a file line by line.
 class LineFile {
@@ -122,7 +121,7 @@ class LineFile {
       line.write(char);
       priorChar = char;
     }
-    final endOfFile = line.isEmpty && foundDelimiter == false;
+    final endOfFile = line.isEmpty && !foundDelimiter;
     return endOfFile ? null : line.toString();
   }
 
