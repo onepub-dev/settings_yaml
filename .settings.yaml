@@ -1,0 +1,8 @@
+# SettingsYaml settings file
+dbname: "billing"
+dbusername: "username"
+dbpassword: "apassword"
+timeout: 300
+coefficient: 10.85
+active: true
+one.two: "five"

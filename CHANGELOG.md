@@ -1,3 +1,8 @@
+# 8.3.0
+- updated the doco to make a clear distinction between the methods that access
+ a top level key and those that can access a value using a path selector.
+- Fixed a mistake in the readme. Updated to latest lint_hard and fixed lints.
+
 # 8.2.0
 - removed the dependency on dcli_core to break the circular dependencies.
   this required copying a number of functions from the dcli_core pacakge.

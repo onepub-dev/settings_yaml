@@ -30,12 +30,15 @@ void load() {
   /// load an existing .settings.yaml, if it doesn't exist then create it.
   var settings = SettingsYaml.load(pathToSettings: '.settings.yaml', create: true);
 
+  /// Access simple top level keys.
   var dbname = settings['dbname'] as String;
   var username = settings['dbusername']as String;
   var password = settings['dbpassword']as String;
   var timeout = settings['timeout']as String;
   var ats = settings['ats']; // List<dynamic>
 
+
+  
   List<String> atsAsString = settings.asStringList['ats'];
   var hosts = settings['hosts'] as Map<String, String>;
 
@@ -55,13 +58,19 @@ void load() {
   /// change something
   var newPassword = ask('password');
   settings['dbpassword'] = newPassword;
+
+  /// Write a map into a top level key.
   settings['hosts'] = <String, String>{
         'host1': 'one',
         'host2': 'two',
         'host3': 'three';
   settings['ats'] = <String>['cat', 'bat', 'rat'];
 
+  
   settings.save();
+
+  /// We can access a value at a path using the 'selectAsXxx' methods.
+  settings.selectAsString('hosts.host1');
 }
 ```
 

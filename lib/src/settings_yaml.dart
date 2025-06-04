@@ -134,50 +134,61 @@ class SettingsYaml {
   /// The complete map of key/value pairs
   Map<String, dynamic> valueMap = <String, dynamic>{};
 
-  /// Returns a list at [path] as a String list.
+  /// Returns a String list for the top level [key].
+  /// 
   /// If the key isn't a valid List<String>  then [defaultValue] is returned
   /// Use [validStringList] to determine if the key exists and is
   /// a valid List<String>.
-  List<String> asStringList(String path,
+  /// 
+  /// use selectAsList if you need a list that is not at the top
+  /// of the yaml tree.
+  List<String> asStringList(String key,
       {List<String> defaultValue = const <String>[]}) {
-    if (validStringList(path)) {
-      return (valueMap[path] as List<dynamic>).cast<String>();
+    if (validStringList(key)) {
+      return (valueMap[key] as List<dynamic>).cast<String>();
     } else {
       return defaultValue;
     }
   }
 
-  /// returns the value at [path] as an String.
+  /// returns the value at the top level [key] as an String.
   /// If the value isn't an String then an exception will be thrown.
   /// If the key isn't a valid String then [defaultValue] is returned
   /// Use [validString] to determine if the key exists and is
   /// a valid String.
-  String asString(String path, {String defaultValue = ''}) =>
-      validString(path) ? valueMap[path] as String : defaultValue;
+  /// 
+  /// use selectAsString if you need a String that is not at the top
+  /// of the yaml tree.
+  String asString(String key, {String defaultValue = ''}) =>
+      validString(key) ? valueMap[key] as String : defaultValue;
 
-  /// returns the value at [path] as an bool.
+  /// returns the value at at the top level [key] as an bool.
   /// If the value isn't an bool then an exception will be thrown.
   /// If the key isn't a valid bool then [defaultValue] is returned
   /// Use [validBool] to determine if the key exists and is
   /// a valid bool.
-  bool asBool(String path, {bool defaultValue = true}) =>
-      validBool(path) ? valueMap[path] as bool : defaultValue;
+  /// 
+  /// use selectAsBool if you need a bool that is not at the top
+  /// of the yaml tree.
+  
+  bool asBool(String key, {bool defaultValue = true}) =>
+      validBool(key) ? valueMap[key] as bool : defaultValue;
 
-  /// returns the value at [path] as an int.
+  /// returns the value at at the top level [key] as an int.
   /// If the value isn't an int then an exception will be thrown.
   /// If the key isn't a valid int then [defaultValue] is returned
   /// Use [validInt] to determine if the key exists and is
   /// a valid int.
-  int asInt(String path, {int defaultValue = 0}) =>
-      validInt(path) ? valueMap[path] as int : defaultValue;
+  int asInt(String key, {int defaultValue = 0}) =>
+      validInt(key) ? valueMap[key] as int : defaultValue;
 
-  /// returns the value at [path] as an double.
+  /// returns the value at at the top level [key] as an double.
   /// If the value isn't an double then an exception will be thrown.
   /// If the key isn't a valid int then [defaultValue] is returned.
   /// Use [validDouble] to determine if the key exists and is
   /// a valid double.
-  double asDouble(String path, {double defaultValue = 0.0}) =>
-      validDouble(path) ? valueMap[path] as double : defaultValue;
+  double asDouble(String key, {double defaultValue = 0.0}) =>
+      validDouble(key) ? valueMap[key] as double : defaultValue;
 
   /// Saves the settings back to the settings file.
   /// To avoid a corrupted file in the event of a crash we first
@@ -215,16 +226,16 @@ class SettingsYaml {
     }
   }
 
-  /// Returns the value for the given key.
+  /// Returns the value for the given top level key.
   ///
   /// If the key doesn't exists then null is returned.
   /// ```
   /// var settings = SettingsYaml.load('mysettings.yaml');
   /// var password = settings['password'];
   /// ```
-  dynamic operator [](String path) => _normalizedValue(path);
+  dynamic operator [](String key) => _normalizedValue(key);
 
-  /// Adds or Updates the given key/value pair.
+  /// Adds or Updates the given top level key/value pair.
   ///
   /// The value may be a String or a number (int, double);
   ///
@@ -267,33 +278,35 @@ class SettingsYaml {
     }
   }
 
-  /// Returns true if the key has a value which is a
+  /// Returns true if the top level key has a value which is a
   /// String which is non-null and not empty
   bool validString(String key) {
     final dynamic value = valueMap[key];
     return value != null && value is String && value.isNotEmpty;
   }
 
+  /// Returns true if the top level key has a value which is a
+  /// String List which is not empty.
   bool validStringList(String key) {
     final dynamic value = valueMap[key];
     return value != null && value is List<dynamic> && value.isNotEmpty;
   }
 
-  /// Returns true if the key has a value which is an
+  /// Returns true if the top level key has a value which is an
   /// int. Empty or null value returns false.
   bool validInt(String key) {
     final dynamic value = valueMap[key];
     return value != null && value is int;
   }
 
-  /// Returns true if the key has a value which is a
+  /// Returns true if the top level key has a value which is a
   /// double. Empty or null value returns false.
   bool validDouble(String key) {
     final dynamic value = valueMap[key];
     return value != null && value is double;
   }
 
-  /// Returns true if the key has a value which is a
+  /// Returns true if the top level key has a value which is a
   /// bool. Empty or null value returns false.
   bool validBool(String key) {
     final dynamic value = valueMap[key];
@@ -306,108 +319,108 @@ class SettingsYaml {
     return convertNode(value);
   }
 
-  /// Returns the String attribute at [selector]
-  /// See [traverse] for details on the syntax of [selector]
+  /// Returns the String attribute at [path]
+  /// See [traverse] for details on the syntax of [path]
   /// Throws a [SettingsYamlException] if
   /// an error occurs reading the selector
   /// Throws a [PathNotFoundException] exception
   /// If the selector doesn't lead to a valid
   /// location.
-  String? selectAsString(String selector) {
-    final dynamic value = traverse(selector);
+  String? selectAsString(String path) {
+    final dynamic value = traverse(path);
     if (value is! String) {
       throw SettingsYamlException(
-          'Expected a String at $selector. Found $value');
+          'Expected a String at $path. Found $value');
     }
 
     return value;
   }
 
-  /// Returns the int attribute at [selector]
-  /// See [traverse] for details on the syntax of [selector]
+  /// Returns the int attribute at [path]
+  /// See [traverse] for details on the syntax of [path]
   /// Throws a [SettingsYamlException] if
   /// an error occurs reading the selector
   /// Throws a [PathNotFoundException] exception
   /// If the selector doesn't lead to a valid
   /// location.
-  int? selectAsInt(String selector) {
-    final dynamic value = traverse(selector);
+  int? selectAsInt(String path) {
+    final dynamic value = traverse(path);
     if (value is! int) {
-      throw SettingsYamlException('Expected a int at $selector. Found $value');
+      throw SettingsYamlException('Expected a int at $path. Found $value');
     }
 
     return value;
   }
 
-  /// Returns the double attribute at [selector]
-  /// See [traverse] for details on the syntax of [selector]
+  /// Returns the double attribute at [path]
+  /// See [traverse] for details on the syntax of [path]
   /// Throws a [SettingsYamlException] if
   /// an error occurs reading the selector
   /// Throws a [PathNotFoundException] exception
   /// If the selector doesn't lead to a valid
   /// location.
-  double? selectAsDouble(String selector) {
-    final dynamic value = traverse(selector);
+  double? selectAsDouble(String path) {
+    final dynamic value = traverse(path);
     if (value is! double) {
       throw SettingsYamlException(
-          'Expected a double at $selector. Found $value');
+          'Expected a double at $path. Found $value');
     }
 
     return value;
   }
 
-  /// Returns the boolean attribute at [selector]
-  /// See [traverse] for details on the syntax of [selector]
+  /// Returns the boolean attribute at [path]
+  /// See [traverse] for details on the syntax of [path]
   /// Throws a [SettingsYamlException] if
   /// an error occurs reading the selector
   /// Throws a [PathNotFoundException] exception
   /// If the selector doesn't lead to a valid
   /// location.
-  bool? selectAsBool(String selector) {
-    final dynamic value = traverse(selector);
+  bool? selectAsBool(String path) {
+    final dynamic value = traverse(path);
     if (value is! bool) {
-      throw SettingsYamlException('Expected a bool at $selector. Found $value');
+      throw SettingsYamlException('Expected a bool at $path. Found $value');
     }
 
     return value;
   }
 
-  /// Returns the list  at [selector]
-  /// See [traverse] for details on the syntax of [selector]
+  /// Returns the list  at [path]
+  /// See [traverse] for details on the syntax of [path]
   /// Throws a [SettingsYamlException] if
   /// an error occurs reading the selector
   /// Throws a [PathNotFoundException] exception
   /// If the selector doesn't lead to a valid
   /// location.
-  List<dynamic>? selectAsList(String selector) {
-    final dynamic list = traverse(selector);
+  List<dynamic>? selectAsList(String path) {
+    final dynamic list = traverse(path);
     if (list is! YamlList) {
-      throw SettingsYamlException('Expected a list at $selector. Found $list');
+      throw SettingsYamlException('Expected a list at $path. Found $list');
     }
     return list.toList();
   }
 
-  /// Returns the map at [selector]
-  /// See [traverse] for details on the syntax of [selector]
+  /// Returns the map at [path]
+  /// See [traverse] for details on the syntax of [path]
   /// Throws a [SettingsYamlException] if
   /// an error occurs reading the selector
   /// Throws a [PathNotFoundException] exception
   /// If the selector doesn't lead to a valid
   /// location.
-  Map<String, dynamic>? selectAsMap(String selector) {
-    final dynamic map = traverse(selector);
+  Map<String, dynamic>? selectAsMap(String path) {
+    final dynamic map = traverse(path);
     if (map is! YamlMap) {
-      throw SettingsYamlException('Expected a map at $selector. Found $map');
+      throw SettingsYamlException('Expected a map at $path. Found $map');
     }
     return map.toMap();
   }
 
-  /// Returns true if the given [selector] exists in the
+  /// Returns true if the given [path] exists in the
   /// settings file.
-  bool selectorExists(String selector) {
+  bool selectorExists(String path) {
     var valid = true;
     try {
-      traverse(selector);
+      traverse(path);
     } on PathNotFoundException catch (_, __) {
       valid = false;
     }

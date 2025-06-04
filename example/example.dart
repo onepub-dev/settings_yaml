@@ -22,12 +22,18 @@ Future<void> save() async {
   settings['coefficient'] = 10.85;
   settings['active'] = true;
 
+  /// Value stored at a path in the yaml
+  /// one:
+  ///   two: five
+  settings['one.two'] = 'five';
+
   await settings.save();
 }
 
 Future<void> load() async {
   final settings = SettingsYaml.load(pathToSettings: '.settings.yaml');
 
+  /// Obtain the values associated with top level keys in the yaml.
   assert(settings.validString('dbname'), 'Should be a string');
   assert(settings.validInt('timeout'), 'Should be an int');
   assert(settings.validDouble('coefficient'), 'Should be a double');
