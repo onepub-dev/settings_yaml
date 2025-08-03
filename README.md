@@ -69,14 +69,13 @@ void load() {
   
   settings.save();
 
-  /// We can access a value at a path using the 'selectAsXxx' methods.
-  settings.selectAsString('hosts.host1');
 }
 ```
 
 # Access nested content
 
-SettingsYaml also provides access to nested attributes using path selectors:
+SettingsYaml also provides access to nested attributes using path selectors
+with the selectAsXXXX group of methods:
 
 ```dart
  var content = '''name: brett
