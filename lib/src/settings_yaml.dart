@@ -135,11 +135,11 @@ class SettingsYaml {
   Map<String, dynamic> valueMap = <String, dynamic>{};
 
   /// Returns a String list for the top level [key].
-  /// 
+  ///
   /// If the key isn't a valid List<String>  then [defaultValue] is returned
   /// Use [validStringList] to determine if the key exists and is
   /// a valid List<String>.
-  /// 
+  ///
   /// use selectAsList if you need a list that is not at the top
   /// of the yaml tree.
   List<String> asStringList(String key,
@@ -156,7 +156,7 @@ class SettingsYaml {
   /// If the key isn't a valid String then [defaultValue] is returned
   /// Use [validString] to determine if the key exists and is
   /// a valid String.
-  /// 
+  ///
   /// use selectAsString if you need a String that is not at the top
   /// of the yaml tree.
   String asString(String key, {String defaultValue = ''}) =>
@@ -167,10 +167,10 @@ class SettingsYaml {
   /// If the key isn't a valid bool then [defaultValue] is returned
   /// Use [validBool] to determine if the key exists and is
   /// a valid bool.
-  /// 
+  ///
   /// use selectAsBool if you need a bool that is not at the top
   /// of the yaml tree.
-  
+
   bool asBool(String key, {bool defaultValue = true}) =>
       validBool(key) ? valueMap[key] as bool : defaultValue;
 
@@ -329,8 +329,7 @@ class SettingsYaml {
   String? selectAsString(String path) {
     final dynamic value = traverse(path);
     if (value is! String) {
-      throw SettingsYamlException(
-          'Expected a String at $path. Found $value');
+      throw SettingsYamlException('Expected a String at $path. Found $value');
     }
 
     return value;
@@ -362,8 +361,7 @@ class SettingsYaml {
   double? selectAsDouble(String path) {
     final dynamic value = traverse(path);
     if (value is! double) {
-      throw SettingsYamlException(
-          'Expected a double at $path. Found $value');
+      throw SettingsYamlException('Expected a double at $path. Found $value');
     }
 
     return value;
@@ -436,6 +434,10 @@ class SettingsYaml {
     var remaining = parts.length;
 
     dynamic current = _document?.contents.value;
+
+    if (current == null) {
+      return PathNotFoundException('$filePath is empty or missing');
+    }
     var traversed = '';
     var previousTraversed = '';
     for (final part in parts) {
