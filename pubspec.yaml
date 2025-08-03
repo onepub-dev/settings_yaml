@@ -1,5 +1,5 @@
 name: settings_yaml
-version: 8.3.0
+version: 8.3.1
 homepage: https://github.com/bsutton/settings_yaml
 description: Provides a simple means of saving/loading settings from a yaml file without the yaml fuss.
 environment:

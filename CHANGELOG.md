@@ -1,3 +1,6 @@
+# 8.3.1
+- traverse now throws a PathNotFoundException if the settings file is missing or empty.
+
 # 8.3.0
 - updated the doco to make a clear distinction between the methods that access
  a top level key and those that can access a value using a path selector.
