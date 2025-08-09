@@ -55,7 +55,7 @@ void move(String from, String to, {bool overwrite = false}) {
     copy(from, to, overwrite: overwrite);
     delete(from);
   }
-
+  /// we don't care why
   /// ignore: avoid_catches_without_on_clauses
   catch (e) {
     _improveError(e, from, to);

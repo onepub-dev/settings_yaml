@@ -1,9 +1,13 @@
+// this is our public api.
+// ignore_for_file: omit_obvious_property_types
+
 /* Copyright (C) S. Brett Sutton - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
  * Proprietary and confidential
  * Written by Brett Sutton <bsutton@onepub.dev>, Jan 2022
  */
 
+// we are manipulating yaml
 // ignore_for_file: avoid_dynamic_calls
 
 import 'dart:io';
@@ -27,7 +31,7 @@ import 'yaml_map_extension.dart';
 /// ```yaml
 /// password: xxxx
 /// user: xxxx
-/// '''
+/// ```
 ///
 /// To obtain the value of password use:
 /// ```dart
@@ -52,11 +56,11 @@ import 'yaml_map_extension.dart';
 /// You can also craft a selector to access a specific element in
 /// a yaml list using the '[]' operators.
 ///
-/// To access a list use 'word[n]' where 'n' is the nth instance of the word
+/// To access a list use `word[n]` where 'n' is the nth instance of the word
 /// in a yaml array.
 ///
 /// e.g.
-/// ```
+/// ``` yaml
 /// one:
 ///   - two
 ///   - two
@@ -68,10 +72,22 @@ import 'yaml_map_extension.dart';
 /// traverse('one.two[1].three.four') == 'value'
 /// ```
 class SettingsYaml {
+  YamlDocument? _document;
+
+  String filePath;
+
+  /// The complete map of key/value pairs
+  Map<String, dynamic> valueMap = <String, dynamic>{};
+
+  /// Regex to extract the index from an array selector of the form
+  // ignore: comment_references
+  /// 'word[n]'
+  static final _indexRegx = RegExp(r'^(\w*)\[([0-9]*)\]$');
+
   /// Loads settings from a string.
   /// The [content] must be formatted like a standard yaml file would be:
   ///
-  /// ```
+  ///```dart
   /// var settings = SettingsYaml(content: '''
   /// password: xxxx
   /// user: xxxx
@@ -128,17 +144,11 @@ class SettingsYaml {
     return SettingsYaml.fromString(content: contents, filePath: pathToSettings);
   }
 
-  YamlDocument? _document;
-  String filePath;
-
-  /// The complete map of key/value pairs
-  Map<String, dynamic> valueMap = <String, dynamic>{};
-
   /// Returns a String list for the top level [key].
   ///
-  /// If the key isn't a valid List<String>  then [defaultValue] is returned
+  /// If the key isn't a valid `List<String>`  then [defaultValue] is returned
   /// Use [validStringList] to determine if the key exists and is
-  /// a valid List<String>.
+  /// a valid `List<String>`.
   ///
   /// use selectAsList if you need a list that is not at the top
   /// of the yaml tree.
@@ -198,7 +208,7 @@ class SettingsYaml {
   Future<void> save() async {
     final tmp = createTempFilename();
 
-    await withOpenLineFile(tmp, (file) async {
+    withOpenLineFile(tmp, (file) {
       file.write('# SettingsYaml settings file');
 
       for (final pair in valueMap.entries) {
@@ -229,7 +239,7 @@ class SettingsYaml {
   /// Returns the value for the given top level key.
   ///
   /// If the key doesn't exists then null is returned.
-  /// ```
+  /// ```dart
   /// var settings = SettingsYaml.load('mysettings.yaml');
   /// var password = settings['password'];
   /// ```
@@ -239,7 +249,7 @@ class SettingsYaml {
   ///
   /// The value may be a String or a number (int, double);
   ///
-  /// ```
+  /// ``` dart
   /// var settings = SettingsYaml.load('mysettings.yaml');
   ///  settings['password'] = 'a new password';
   /// settings.save();
@@ -425,10 +435,6 @@ class SettingsYaml {
     return valid;
   }
 
-  /// Regex to extract the index from an array selector of the form
-  // ignore: comment_references
-  /// 'word[n]'
-  static final _indexRegx = RegExp(r'^(\w*)\[([0-9]*)\]$');
   dynamic traverse(String selector) {
     final parts = selector.split('.');
     var remaining = parts.length;
@@ -491,19 +497,19 @@ class SettingsYaml {
 }
 
 class SettingsYamlException implements Exception {
-  SettingsYamlException(this.message);
-
   String message;
+
+  SettingsYamlException(this.message);
 
   @override
   String toString() => message;
 }
 
 class PathNotFoundException implements SettingsYamlException {
-  PathNotFoundException(this.message);
-
   @override
   String message;
+
+  PathNotFoundException(this.message);
 
   @override
   String toString() => message;

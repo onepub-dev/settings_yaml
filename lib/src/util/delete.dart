@@ -33,6 +33,7 @@ import 'truepath.dart';
     try {
       File(path).deleteSync();
     }
+    // we dont' care why
     // ignore: avoid_catches_without_on_clauses
     catch (e) {
       throw DeleteException(

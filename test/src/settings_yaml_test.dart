@@ -14,7 +14,7 @@ import 'package:settings_yaml/src/util/line_file.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('SettingsYaml fromString', () async {
+  test('SettingsYaml fromString', ()  {
     const content = '''
 name: brett
 hostname: slayer
@@ -27,7 +27,7 @@ port: 10
     expect(yaml['port'], equals(10));
   });
 
-  test('casting', () async {
+  test('casting', ()  {
     const content = '''
 name: brett
 string: slayer
@@ -126,14 +126,14 @@ hostnames:
     });
   });
 
-  test('SettingsYaml fromString - empty content', () async {
+  test('SettingsYaml fromString - empty content', ()  {
     const content = '';
     const path = '/tmp/settings.yaml';
     final yaml = SettingsYaml.fromString(content: content, filePath: path);
     expect(yaml['name'], isNull);
     expect(yaml.validString('username'), false);
   });
-  test('SettingsYaml fromFile', () async {
+  test('SettingsYaml fromFile', ()  {
     const path = '/tmp/settings.yaml';
     const content = '''
 name: brett
@@ -144,7 +144,7 @@ coefficient: 8.25
     if (exists(path)) {
       delete(path);
     }
-    await withOpenLineFile(path, (file) async {
+     withOpenLineFile(path, (file)  {
       file.write(content);
     });
 
@@ -166,7 +166,7 @@ port: 10
       delete(path);
     }
 
-    await withOpenLineFile(path, (file) async {
+     withOpenLineFile(path, (file)  {
       file.write(content);
     });
 
@@ -218,7 +218,7 @@ port: 10
     expect(yaml['port'], equals(10));
   });
 
-  test('SettingsYaml validXXX', () async {
+  test('SettingsYaml validXXX', ()  {
     const path = '/tmp/settings.yaml';
     const content = '''
 name: brett
@@ -262,7 +262,7 @@ volume: 10.0
     expect(yaml.validString('badkey'), equals(false));
   });
 
-  test('default Values - good content', () async {
+  test('default Values - good content', ()  {
     const path = '/tmp/settings.yaml';
 
     const goodContent = '''
@@ -292,7 +292,7 @@ list: [one, two, three]
     expect(yaml.asStringList('list'), equals(['one', 'two', 'three']));
   });
 
-  test('default Values - bad content', () async {
+  test('default Values - bad content', ()  {
     const path = '/tmp/settings.yaml';
 
     const badContent = '''
@@ -369,8 +369,10 @@ people:
 
     final t1 = settings.selectAsList('people');
     expect(t1!.length, equals(2));
+    // testing
     // ignore: avoid_dynamic_calls
     expect(t1[0]['name'], equals('brett'));
+    // testing
     // ignore: avoid_dynamic_calls
     expect(t1[1]['name'], equals('john'));
     // expect(

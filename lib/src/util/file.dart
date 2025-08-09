@@ -24,9 +24,9 @@ import 'touch.dart';
 /// directory otherwise the file will be created in the system
 /// temp directory.
 ///
-/// The temp file name will be <uuid>.tmp
+/// The temp file name will be `<uuid>.tmp`
 /// unless you provide a [suffix] in which
-/// case the file name will be <uuid>.<suffix>
+/// case the file name will be `<uuid>.<suffix>`
 Future<R> withTempFileAsync<R>(
   Future<R> Function(String tempFile) action, {
   String? suffix,
@@ -59,9 +59,9 @@ Future<R> withTempFileAsync<R>(
 ///
 /// This method does NOT create the file.
 ///
-/// The temp file name will be <uuid>.tmp
+/// The temp file name will be `<uuid>.tmp`
 /// unless you provide a [suffix] in which
-/// case the file name will be <uuid>.<suffix>
+/// case the file name will be `<uuid>.<suffix>`
 String createTempFilename({String? suffix, String? pathToTempDir}) {
   var finalsuffix = suffix ?? 'tmp';
 
