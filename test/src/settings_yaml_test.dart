@@ -1,3 +1,4 @@
+import 'dart:io';
 /* Copyright (C) S. Brett Sutton - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
  * Proprietary and confidential
@@ -8,26 +9,31 @@ import 'package:collection/collection.dart';
 // import 'package:dcli/dcli.dart' hide equals;
 import 'package:settings_yaml/settings_yaml.dart';
 import 'package:settings_yaml/src/util/delete.dart';
-import 'package:settings_yaml/src/util/file.dart';
 import 'package:settings_yaml/src/util/is.dart';
 import 'package:settings_yaml/src/util/line_file.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('SettingsYaml fromString', ()  {
+  late Directory temporary;
+  late String path;
+  setUp(() {
+    temporary = Directory.systemTemp.createTempSync('settings-yaml-test-');
+    path = '${temporary.path}/settings.yaml';
+  });
+  tearDown(() => temporary.deleteSync(recursive: true));
+  test('SettingsYaml fromString', () {
     const content = '''
 name: brett
 hostname: slayer
 port: 10
 ''';
-    const path = '/tmp/settings.yaml';
     final yaml = SettingsYaml.fromString(content: content, filePath: path);
     expect(yaml['name'], equals('brett'));
     expect(yaml['hostname'], equals('slayer'));
     expect(yaml['port'], equals(10));
   });
 
-  test('casting', ()  {
+  test('casting', () {
     const content = '''
 name: brett
 string: slayer
@@ -35,7 +41,6 @@ int: 10
 double: 10.1
 bool: true
 ''';
-    const path = '/tmp/settings.yaml';
     final yaml = SettingsYaml.fromString(content: content, filePath: path);
     expect(yaml.asString('string'), equals('slayer'));
     expect(yaml.asInt('int'), equals(10));
@@ -52,17 +57,16 @@ double: 10.1
 bool: true
 ''';
 
-    await withTempFileAsync((path) async {
-      const path = '/tmp/settings.yaml';
+    {
       final yaml = SettingsYaml.fromString(content: content, filePath: path);
       yaml['sex'] = 'male';
       expect(yaml.asString('sex'), equals('male'));
 
       await yaml.save();
-      SettingsYaml.load(pathToSettings: path);
-      expect(yaml.asString('name'), equals('brett'));
-      expect(yaml.asString('sex'), equals('male'));
-    });
+      final reloaded = SettingsYaml.load(pathToSettings: path);
+      expect(reloaded.asString('name'), equals('brett'));
+      expect(reloaded.asString('sex'), equals('male'));
+    }
   });
 
   test('SettingsYaml String list', () async {
@@ -70,16 +74,15 @@ bool: true
 name: brett
 hostnames: [one, two, three]
 ''';
-    const path = '/tmp/settings.yaml';
     final yaml = SettingsYaml.fromString(content: content, filePath: path);
     expect(yaml['hostnames'], equals(['one', 'two', 'three']));
 
-    await withTempFileAsync((pathTo) async {
-      var yaml = SettingsYaml.load(pathToSettings: pathTo);
+    {
+      var yaml = SettingsYaml.load(pathToSettings: path);
       yaml['list'] = <String>['one', 'two', 'three'];
       await yaml.save();
 
-      yaml = SettingsYaml.load(pathToSettings: pathTo);
+      yaml = SettingsYaml.load(pathToSettings: path);
 
       expect(yaml['list'], equals(['one', 'two', 'three']));
 
@@ -88,7 +91,7 @@ hostnames: [one, two, three]
 
       final atsAsString = yaml.asStringList('list');
       expect(atsAsString, equals(['one', 'two', 'three']));
-    });
+    }
   });
 
   test('SettingsYaml String map', () async {
@@ -99,7 +102,6 @@ hostnames:
   host2: two
   host3: three
 ''';
-    const path = '/tmp/settings.yaml';
     final yaml = SettingsYaml.fromString(content: content, filePath: path);
     expect(
         const MapEquality<String, String>().equals(
@@ -107,8 +109,8 @@ hostnames:
             {'host1': 'one', 'host2': 'two', 'host3': 'three'}),
         isTrue);
 
-    await withTempFileAsync((pathTo) async {
-      var yaml = SettingsYaml.load(pathToSettings: pathTo);
+    {
+      var yaml = SettingsYaml.load(pathToSettings: path);
       yaml['map'] = <String, String>{
         'host1': 'one',
         'host2': 'two',
@@ -116,25 +118,23 @@ hostnames:
       };
       await yaml.save();
 
-      yaml = SettingsYaml.load(pathToSettings: pathTo);
+      yaml = SettingsYaml.load(pathToSettings: path);
 
       expect(
           const MapEquality<String, String>().equals(
               Map.from(yaml['map'] as Map<String, dynamic>),
               {'host1': 'one', 'host2': 'two', 'host3': 'three'}),
           isTrue);
-    });
+    }
   });
 
-  test('SettingsYaml fromString - empty content', ()  {
+  test('SettingsYaml fromString - empty content', () {
     const content = '';
-    const path = '/tmp/settings.yaml';
     final yaml = SettingsYaml.fromString(content: content, filePath: path);
     expect(yaml['name'], isNull);
     expect(yaml.validString('username'), false);
   });
-  test('SettingsYaml fromFile', ()  {
-    const path = '/tmp/settings.yaml';
+  test('SettingsYaml fromFile', () {
     const content = '''
 name: brett
 hostname: slayer
@@ -144,7 +144,7 @@ coefficient: 8.25
     if (exists(path)) {
       delete(path);
     }
-     withOpenLineFile(path, (file)  {
+    withOpenLineFile(path, (file) {
       file.write(content);
     });
 
@@ -156,7 +156,6 @@ coefficient: 8.25
   });
 
   test('SettingsYaml save', () async {
-    const path = '/tmp/settings.yaml';
     const content = '''
 name: brett
 hostname: slayer
@@ -166,7 +165,7 @@ port: 10
       delete(path);
     }
 
-     withOpenLineFile(path, (file)  {
+    withOpenLineFile(path, (file) {
       file.write(content);
     });
 
@@ -181,8 +180,6 @@ port: 10
   });
 
   test('SettingsYaml load create with no file.', () async {
-    const path = '/tmp/settings.yaml';
-
     if (exists(path)) {
       delete(path);
     }
@@ -191,8 +188,6 @@ port: 10
   });
 
   test('SettingsYaml load create with no file and save settings.', () async {
-    const path = '/tmp/settings.yaml';
-
     if (exists(path)) {
       delete(path);
     }
@@ -218,8 +213,7 @@ port: 10
     expect(yaml['port'], equals(10));
   });
 
-  test('SettingsYaml validXXX', ()  {
-    const path = '/tmp/settings.yaml';
+  test('SettingsYaml validXXX', () {
     const content = '''
 name: brett
 hostname: slayer
@@ -262,9 +256,7 @@ volume: 10.0
     expect(yaml.validString('badkey'), equals(false));
   });
 
-  test('default Values - good content', ()  {
-    const path = '/tmp/settings.yaml';
-
+  test('default Values - good content', () {
     const goodContent = '''
 name: brett
 hostname: slayer
@@ -292,9 +284,7 @@ list: [one, two, three]
     expect(yaml.asStringList('list'), equals(['one', 'two', 'three']));
   });
 
-  test('default Values - bad content', ()  {
-    const path = '/tmp/settings.yaml';
-
+  test('default Values - bad content', () {
     const badContent = '''
 name: brett
 hostname: 
@@ -324,8 +314,6 @@ list:
   });
 
   test('force String', () async {
-    const path = '/tmp/settings.yaml';
-
     const content = '''
 name: brett
 hostname: slayer
@@ -343,8 +331,6 @@ imageid: "65385002e970"
   });
 
   test('selectors -- good', () {
-    const path = '/tmp/settings.yaml';
-
     const content = '''
 name: brett
 hostname: slayer
@@ -388,8 +374,6 @@ people:
   });
 
   test('selectors -- bad', () {
-    const path = '/tmp/settings.yaml';
-
     const content = '''
 name: brett
 hostname: slayer

@@ -1,0 +1,6 @@
+*.log
+.dart_tool/
+.git/
+.failed_tracker
+.packages
+test/min_sdk/

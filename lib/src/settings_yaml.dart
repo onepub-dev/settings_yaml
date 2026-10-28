@@ -15,14 +15,10 @@ import 'dart:io';
 import 'package:path/path.dart';
 import 'package:yaml/yaml.dart';
 
-import 'util/delete.dart';
-import 'util/file.dart';
+import 'secure_save.dart';
 import 'util/is.dart';
-import 'util/line_file.dart';
-import 'util/move.dart';
 import 'util/truepath.dart';
 import 'yaml.dart';
-import 'yaml_map_extension.dart';
 
 /// Provides the ability to read/write simply settings stored in a yaml file
 /// without having to worry about parsing the yaml file or programatically
@@ -107,9 +103,7 @@ class SettingsYaml {
     if (_document!.contents is YamlMap) {
       final topMap = _document!.contents as YamlMap;
 
-      for (final pair in topMap.value.entries) {
-        valueMap[pair.key as String] = pair.value;
-      }
+      valueMap = normalizeMapKeys(topMap);
     }
 
     /// else the settings file was empty.
@@ -155,7 +149,7 @@ class SettingsYaml {
   List<String> asStringList(String key,
       {List<String> defaultValue = const <String>[]}) {
     if (validStringList(key)) {
-      return (valueMap[key] as List<dynamic>).cast<String>();
+      return (convertNode(valueMap[key]) as List<dynamic>).cast<String>();
     } else {
       return defaultValue;
     }
@@ -200,40 +194,13 @@ class SettingsYaml {
   double asDouble(String key, {double defaultValue = 0.0}) =>
       validDouble(key) ? valueMap[key] as double : defaultValue;
 
-  /// Saves the settings back to the settings file.
-  /// To avoid a corrupted file in the event of a crash we first
-  /// copy the existing
-  /// settings file to a .bak file.
-  /// If the save fails you may need to manually rename the .bak file.
+  /// Saves validated settings using a private same-directory staging area.
+  /// The directory must be trusted; concurrent writers and
+  /// hostile path changes are unsupported. The original remains until rename.
+  /// Existing .bak files are untouched. See README for permissions and limits.
   Future<void> save() async {
-    final tmp = createTempFilename();
-
-    withOpenLineFile(tmp, (file) {
-      file.write('# SettingsYaml settings file');
-
-      for (final pair in valueMap.entries) {
-        if (pair.value is String) {
-          /// quote the string to ensure it doesn't get interpreted
-          /// as a num/bool etc and import.
-          file.append('${pair.key}: "${pair.value}"');
-        } else {
-          file.append('${pair.key}: ${pair.value}');
-        }
-      }
-    });
-
-    /// Do a safe save.
-    final back = '$filePath.bak';
-    if (exists(back)) {
-      delete(back);
-    }
-    if (exists(filePath)) {
-      move(filePath, back);
-    }
-    move(tmp, filePath);
-    if (exists(back)) {
-      delete(back);
-    }
+    final content = serializeSettings(valueMap);
+    secureSave(filePath, content);
   }
 
   /// Returns the value for the given top level key.
@@ -339,7 +306,7 @@ class SettingsYaml {
   String? selectAsString(String path) {
     final dynamic value = traverse(path);
     if (value is! String) {
-      throw SettingsYamlException('Expected a String at $path. Found $value');
+      throw SettingsYamlException('Expected a String at $path');
     }
 
     return value;
@@ -355,7 +322,7 @@ class SettingsYaml {
   int? selectAsInt(String path) {
     final dynamic value = traverse(path);
     if (value is! int) {
-      throw SettingsYamlException('Expected a int at $path. Found $value');
+      throw SettingsYamlException('Expected a int at $path');
     }
 
     return value;
@@ -371,7 +338,7 @@ class SettingsYaml {
   double? selectAsDouble(String path) {
     final dynamic value = traverse(path);
     if (value is! double) {
-      throw SettingsYamlException('Expected a double at $path. Found $value');
+      throw SettingsYamlException('Expected a double at $path');
     }
 
     return value;
@@ -387,7 +354,7 @@ class SettingsYaml {
   bool? selectAsBool(String path) {
     final dynamic value = traverse(path);
     if (value is! bool) {
-      throw SettingsYamlException('Expected a bool at $path. Found $value');
+      throw SettingsYamlException('Expected a bool at $path');
     }
 
     return value;
@@ -402,8 +369,8 @@ class SettingsYaml {
   /// location.
   List<dynamic>? selectAsList(String path) {
     final dynamic list = traverse(path);
-    if (list is! YamlList) {
-      throw SettingsYamlException('Expected a list at $path. Found $list');
+    if (list is! List<dynamic>) {
+      throw SettingsYamlException('Expected a list at $path');
     }
     return list.toList();
   }
@@ -416,11 +383,11 @@ class SettingsYaml {
   /// If the selector doesn't lead to a valid
   /// location.
   Map<String, dynamic>? selectAsMap(String path) {
-    final dynamic map = traverse(path);
-    if (map is! YamlMap) {
-      throw SettingsYamlException('Expected a map at $path. Found $map');
+    final dynamic map = _traverse(path, normalizeMaps: true);
+    if (map is! Map<String, dynamic>) {
+      throw SettingsYamlException('Expected a map at $path');
     }
-    return map.toMap();
+    return map;
   }
 
   /// Returns true if the given [path] exists in the
@@ -429,20 +396,26 @@ class SettingsYaml {
     var valid = true;
     try {
       traverse(path);
-    } on PathNotFoundException catch (_, __) {
+    } on PathNotFoundException {
       valid = false;
     }
     return valid;
   }
 
-  dynamic traverse(String selector) {
+  dynamic traverse(String selector) => _traverse(selector);
+
+  dynamic _traverse(String selector, {bool normalizeMaps = false}) {
     final parts = selector.split('.');
+    if (parts.length > 64) {
+      throw SettingsYamlException('Settings exceed the traversal budget.');
+    }
+    final keys = SelectorKeys();
     var remaining = parts.length;
 
-    dynamic current = _document?.contents.value;
+    dynamic current = valueMap;
 
-    if (current == null) {
-      return PathNotFoundException('$filePath is empty or missing');
+    if (valueMap.isEmpty) {
+      throw PathNotFoundException('$filePath is empty or missing');
     }
     var traversed = '';
     var previousTraversed = '';
@@ -457,7 +430,7 @@ class SettingsYaml {
       if (remaining > 0) {
         if (part.contains('[')) {
           /// we have a list selector of the form 'attribute[n]'
-          if (current is! YamlList) {
+          if (current is! List) {
             throw SettingsYamlException('Expected a map at $traversed');
           }
 
@@ -472,18 +445,19 @@ class SettingsYaml {
           final index = int.parse(matches.first.group(2)!);
           current = current[index];
 
-          if (current.keys.first != key) {
+          final firstKey = keys.key(current.keys.first);
+          if (firstKey != key) {
             throw SettingsYamlException('Expected a index selector of '
-                '$previousTraversed.${current.keys.first}[$index]. '
+                '$previousTraversed.$firstKey[$index]. '
                 'Found $previousTraversed.$key[$index]');
           }
         } else {
-          if (current is! YamlMap) {
+          if (current is! Map) {
             throw SettingsYamlException(
                 'As $previousTraversed is a list expected $traversed to be a '
                 'list index. e.g $traversed[i]');
           }
-          current = current[part];
+          current = keys.resolve(current, part);
           if (current == null) {
             throw PathNotFoundException('Invalid path: $traversed');
           }
@@ -492,7 +466,7 @@ class SettingsYaml {
         remaining--;
       }
     }
-    return current;
+    return keys.convertValue(current, normalizeMaps: normalizeMaps);
   }
 }
 

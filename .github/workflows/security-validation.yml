@@ -1,0 +1,38 @@
+name: Security validation
+
+on:
+  push:
+    branches:
+      - security/settings-yaml-8.3.2
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - run: dart pub get
+      - run: dart test --reporter expanded
+      - run: dart analyze lib test
+
+  minimum-sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: 3.0.7
+      - run: dart pub get
+        working-directory: test/min_sdk
+      - run: dart analyze lib
+        working-directory: test/min_sdk
