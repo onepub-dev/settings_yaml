@@ -1,7 +1,8 @@
 # 8.3.2
 - Escape keys and nested values using YAML-compatible JSON syntax; reject unsupported values, key collisions, cycles and excessive expansion before saving.
 - Bound recursive getters and selectors while retaining mutable Dart collection getters. Normalize wrapped scalar keys with collision checks; selectors read current settings consistently.
-- Add platform save adapters with private staging, preservation of existing access metadata, and recovery-aware cleanup. Existing .bak files are untouched. Native macOS and Windows validation remains a release blocker for this uncommitted patch.
+- Add platform save adapters with checked staging policies, preservation of existing access metadata, and recovery-aware cleanup. Existing .bak files are untouched. Native macOS and Windows validation remains a release blocker.
+- Stage Windows replacements as unique siblings: verify private creation, apply and verify the original reader policy while empty, then reopen and recheck before writing. Existing authorized readers can access the stage after its exclusive handle closes. Keep fresh-open postcommit verification and same-parent recovery backups; inherited ACL behavior remains unproven pending native CI.
 - Isolate tests in disposable directories and document the security contract.
 
 # 8.3.1

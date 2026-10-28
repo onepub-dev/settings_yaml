@@ -15,6 +15,7 @@ import 'windows_access_policy.dart';
 /// Non-null access SACLs fail before replacement. This adapter
 /// cannot safely reproduce their inheritance and privilege semantics.
 void secureSaveWindows(String absolutePath, String content) {
+  final bytes = utf8.encode(content);
   final api = _Windows();
   using((arena) {
     final target = absolutePath.toNativeUtf16(allocator: arena);
@@ -34,8 +35,8 @@ void secureSaveWindows(String absolutePath, String content) {
           'policy; destination unchanged: $absolutePath');
     }
 
-    // OW is OWNER RIGHTS, not CREATOR OWNER. Neither this directory nor the
-    // file ever inherits a permissive DACL, including during creation.
+    // OW is OWNER RIGHTS, not CREATOR OWNER. Create the empty sibling with a
+    // protected private DACL before preparing the destination's policy.
     final descriptor = arena<Pointer<Void>>();
     if (api.convert(
           'D:P(A;;FA;;;OW)'.toNativeUtf16(allocator: arena),
@@ -52,36 +53,26 @@ void secureSaveWindows(String absolutePath, String content) {
       ..length = sizeOf<_SecurityAttributes>()
       ..descriptor = descriptor.value
       ..inheritHandle = 0;
-    final directory =
+    final prefix =
         p.join(p.dirname(absolutePath), '.settings_yaml-${const Uuid().v4()}');
-    final stage = p.join(directory, 'settings');
-    final backup = p.join(directory, 'original');
-    if (api.createDirectory(
-            directory.toNativeUtf16(allocator: arena), security) ==
-        0) {
-      api.fail('Create private staging directory', directory);
-    }
+    final stage = '$prefix.stage';
+    final backup = '$prefix.original';
+    var stageCreated = false;
+    var backupCreated = false;
     var retainRecovery = false;
+    var contentStarted = false;
+    Object? primaryError;
     try {
-      final directoryHandle = api.createFile(
-          directory.toNativeUtf16(allocator: arena),
-          0x20000,
-          7,
-          nullptr,
-          3,
-          0x2200000,
-          nullptr);
-      if (api.invalid(directoryHandle)) {
-        api.fail('Open private staging directory', directory);
+      // ReplaceFileW can overwrite its backup name. Under the trusted-parent,
+      // no-concurrent-mutation contract, reject collisions before using it.
+      if (api.attributes(backup.toNativeUtf16(allocator: arena)) !=
+              0xffffffff ||
+          api.lastError() != 2) {
+        throw SettingsYamlException('Recovery path is not available: $backup');
       }
-      try {
-        api.verifyPrivate(directoryHandle, descriptor.value, arena, directory);
-      } finally {
-        api.close(directoryHandle);
-      }
-      final handle = api.createFile(
+      var handle = api.createFile(
           stage.toNativeUtf16(allocator: arena),
-          0xc00e0000,
+          0xc0150000,
           0,
           security,
           1,
@@ -90,9 +81,16 @@ void secureSaveWindows(String absolutePath, String content) {
       if (api.invalid(handle)) {
         api.fail('Create private staging file', stage);
       }
+      stageCreated = true;
       var open = true;
       try {
+        final identity = api.inspectFile(handle, arena, stage, empty: true);
         api.verifyPrivate(handle, descriptor.value, arena, stage);
+        final privatePolicy = api.readHandlePolicy(handle, arena, stage);
+        if (!privatePolicy.supportedForReplacement) {
+          throw SettingsYamlException('Cannot safely preserve staging '
+              'access-SACL policy; no content written: $stage');
+        }
         if (exists && attributes & 0x4000 != 0) {
           final stageAttributes =
               api.attributes(stage.toNativeUtf16(allocator: arena));
@@ -101,13 +99,38 @@ void secureSaveWindows(String absolutePath, String content) {
                 'no content written: $stage');
           }
         }
-        // The restrictive creation descriptor precedes all secret data.
-        final bytes = utf8.encode(content);
+        if (original != null) {
+          api.prepareAccessPolicy(original, handle, arena, stage);
+        }
+        final expected = original ?? privatePolicy;
+        api.verifyAccessPolicy(
+            expected, api.readHandlePolicy(handle, arena, stage), stage);
+        // Test all rights required by replacement before writing secrets.
+        if (api.close(handle) == 0) {
+          api.fail('Close empty staging file', stage);
+        }
+        open = false;
+        handle = api.createFile(stage.toNativeUtf16(allocator: arena),
+            0xc0150000, 0, nullptr, 3, 0x200000, nullptr);
+        if (api.invalid(handle)) {
+          api.fail('Reopen empty staging file', stage);
+        }
+        open = true;
+        api.verifyIdentity(identity,
+            api.inspectFile(handle, arena, stage, empty: true), stage);
+        api.verifyAccessPolicy(
+            expected, api.readHandlePolicy(handle, arena, stage), stage);
+        if (exists && attributes & 0x4000 != 0) {
+          api.verifyEncrypted(handle, arena, stage);
+        }
+        // From this point staging confidentiality equals the verified target
+        // policy. The exclusive handle prevents other opens during writing.
         final buffer = arena<Uint8>(bytes.isEmpty ? 1 : bytes.length);
         buffer.asTypedList(bytes.length).setAll(0, bytes);
         final written = arena<Uint32>();
         var offset = 0;
         while (offset < bytes.length) {
+          contentStarted = true;
           final remaining = bytes.length - offset;
           final length = remaining > 0x40000000 ? 0x40000000 : remaining;
           // Pointer arithmetic operators require Dart 3.3; support Dart 3.0.
@@ -122,18 +145,18 @@ void secureSaveWindows(String absolutePath, String content) {
         if (api.flush(handle) == 0) {
           api.fail('Flush staging file', stage);
         }
-        if (original != null) {
-          api
-            ..prepareAccessPolicy(
-                original, handle, descriptor.value, arena, absolutePath)
-            ..verifyPrivate(handle, descriptor.value, arena, stage,
-                protected: original.control & 0x1000 != 0);
-        }
         // ReplaceFile opens the replacement without sharing; close first.
         if (api.close(handle) == 0) {
           api.fail('Close staging file', stage);
         }
         open = false;
+      } catch (_) {
+        if (open) {
+          // The creation handle keeps DELETE even after the DACL changes.
+          // Deletion takes effect when it closes; never mark a published file.
+          api.discardOnClose(handle, arena);
+        }
+        rethrow;
       } finally {
         if (open) {
           api.close(handle);
@@ -148,34 +171,61 @@ void secureSaveWindows(String absolutePath, String content) {
             0) {
           final error = api.lastError();
           retainRecovery = true;
+          final recovery = api.checkRecovery(original!, backup, arena);
           throw SettingsYamlException('ReplaceFileW failed (Windows $error). '
               'The destination may have moved. Recovery artifacts retained: '
               'original="$backup", replacement="$stage", '
-              'destination="$absolutePath".');
+              'destination="$absolutePath". $recovery');
         }
+        backupCreated = true;
         // Replacement is already committed. Never remove the recovery copy
         // or claim rollback if the filesystem did not preserve the policy.
+        Object? destinationError;
         try {
           final actual = api.readAccessPolicy(target, arena, absolutePath);
           api.verifyAccessPolicy(original!, actual, absolutePath);
-        } catch (error) {
+        } on Object catch (error) {
+          destinationError = error;
+        }
+        // Observe recovery independently even when the fresh destination open
+        // fails, so its usability is never inferred from replacement success.
+        final recovery = api.checkRecovery(original!, backup, arena);
+        if (destinationError != null ||
+            recovery != 'Recovery policy verified.') {
           retainRecovery = true;
           throw SettingsYamlException('Replacement committed, but access '
-              'policy verification failed: $error. Recovery artifacts '
-              'retained: original="$backup", destination="$absolutePath".');
+              'policy verification failed: ${destinationError ?? recovery}. '
+              'Recovery artifacts retained: original="$backup", '
+              'destination="$absolutePath". $recovery');
         }
       } else if (api.move(
               target: target, source: stage.toNativeUtf16(allocator: arena)) ==
           0) {
         api.fail('Move new settings file', absolutePath);
       }
+    } catch (error) {
+      primaryError = error;
+      rethrow;
     } finally {
       if (!retainRecovery) {
-        try {
-          Directory(directory).deleteSync(recursive: true);
-        } on FileSystemException {
-          // Cleanup must neither mask the primary error nor report a failed
-          // save after commit. Any leftovers remain inside the private folder.
+        for (final ownedPath in [
+          if (stageCreated) stage,
+          if (backupCreated) backup,
+        ]) {
+          try {
+            File(ownedPath).deleteSync();
+          } on FileSystemException catch (error) {
+            if (primaryError != null &&
+                !contentStarted &&
+                error.osError?.errorCode != 2 &&
+                error.osError?.errorCode != 3) {
+              throw SettingsYamlException('$primaryError. Empty staging '
+                  'artifact could not be removed: "$ownedPath". No content '
+                  'written; destination unchanged. Cleanup failed: $error');
+            }
+            // Do not mask a primary failure or report failure after commit.
+            // Only paths created by this operation are eligible for cleanup.
+          }
         }
       }
     }
@@ -207,10 +257,22 @@ final class _Windows {
       Pointer<Void> Function(Pointer<Void>)>('LocalFree');
   late final attributes = kernel.lookupFunction<Uint32 Function(Pointer<Utf16>),
       int Function(Pointer<Utf16>)>('GetFileAttributesW');
-  late final createDirectory = kernel.lookupFunction<
-      Int32 Function(Pointer<Utf16>, Pointer<_SecurityAttributes>),
+  late final fileType = kernel.lookupFunction<Uint32 Function(Pointer<Void>),
+      int Function(Pointer<Void>)>('GetFileType');
+  late final fileInformation = kernel.lookupFunction<
+      Int32 Function(Pointer<Void>, Pointer<Uint32>),
       int Function(
-          Pointer<Utf16>, Pointer<_SecurityAttributes>)>('CreateDirectoryW');
+          Pointer<Void>, Pointer<Uint32>)>('GetFileInformationByHandle');
+  late final setFileInformation = kernel.lookupFunction<
+      Int32 Function(Pointer<Void>, Uint32, Pointer<Void>, Uint32),
+      int Function(Pointer<Void>, int, Pointer<Void>,
+          int)>('SetFileInformationByHandle');
+  late final initializeAcl = security.lookupFunction<
+      Int32 Function(Pointer<Void>, Uint32, Uint32),
+      int Function(Pointer<Void>, int, int)>('InitializeAcl');
+  late final addAce = security.lookupFunction<
+      Int32 Function(Pointer<Void>, Uint32, Uint32, Pointer<Void>, Uint32),
+      int Function(Pointer<Void>, int, int, Pointer<Void>, int)>('AddAce');
   late final convert = security.lookupFunction<
           Int32 Function(
               Pointer<Utf16>, Uint32, Pointer<Pointer<Void>>, Pointer<Uint32>),
@@ -302,6 +364,56 @@ final class _Windows {
       throw SettingsYamlException(
           '$operation failed (Windows ${error ?? lastError()}): $path');
 
+  List<int> inspectFile(Pointer<Void> handle, Arena arena, String path,
+      {bool empty = false}) {
+    // BY_HANDLE_FILE_INFORMATION contains thirteen DWORDs, including FILETIMEs.
+    final info = arena<Uint32>(13);
+    if (fileType(handle) != 1 || fileInformation(handle, info) == 0) {
+      fail('Inspect regular staging file', path);
+    }
+    if (info[0] & (0x400 | 0x10) != 0 ||
+        (empty && (info[8] != 0 || info[9] != 0))) {
+      throw SettingsYamlException('Expected a regular '
+          '${empty ? 'empty ' : ''}file: $path');
+    }
+    return [info[7], info[11], info[12]];
+  }
+
+  void verifyIdentity(List<int> expected, List<int> actual, String path) {
+    for (var index = 0; index < expected.length; index++) {
+      if (expected[index] != actual[index]) {
+        throw SettingsYamlException('Staging file identity changed: $path');
+      }
+    }
+  }
+
+  void verifyEncrypted(Pointer<Void> handle, Arena arena, String path) {
+    final info = arena<Uint32>(13);
+    if (fileInformation(handle, info) == 0 || info[0] & 0x4000 == 0) {
+      throw SettingsYamlException('Cannot verify encrypted staging file; '
+          'no content written: $path');
+    }
+  }
+
+  void discardOnClose(Pointer<Void> handle, Arena arena) {
+    final disposition = arena<Uint8>()..value = 1;
+    // FileDispositionInfo / FILE_DISPOSITION_INFO uses a BOOLEAN. Failure
+    // falls back to path cleanup, whose prewrite failures are reported.
+    setFileInformation(handle, 4, disposition.cast<Void>(), 1);
+  }
+
+  String checkRecovery(WindowsAccessPolicy original, String path, Arena arena) {
+    try {
+      verifyAccessPolicy(
+          original,
+          readAccessPolicy(path.toNativeUtf16(allocator: arena), arena, path),
+          path);
+      return 'Recovery policy verified.';
+    } on Object catch (error) {
+      return 'Recovery policy could not be verified: $error';
+    }
+  }
+
   bool sameAcl(Pointer<Void> left, Pointer<Void> right) {
     if (left == nullptr || right == nullptr) {
       return left == right;
@@ -374,6 +486,7 @@ final class _Windows {
       fail('Open destination security', displayPath);
     }
     try {
+      inspectFile(source, arena, displayPath);
       return readHandlePolicy(source, arena, displayPath);
     } finally {
       close(source);
@@ -438,17 +551,11 @@ final class _Windows {
   }
 
   void prepareAccessPolicy(WindowsAccessPolicy original, Pointer<Void> stage,
-      Pointer<Void> privateDescriptor, Arena arena, String path) {
-    // ReplaceFileW preserves the original DACL itself. Applying it here would
-    // recompute inheritance against the private staging parent and discard ID
-    // flags or add AI. Keep the private ACEs until replacement.
-    // OWNER RIGHTS follows the current owner. Changing ownership here could
-    // grant another principal access to secret staging bytes or prevent us
-    // reopening the file for ReplaceFileW. Fail closed for differing identities
-    // rather than changing them or enabling privileges.
+      Arena arena, String path) {
+    // The stage is still empty and shares the destination's parent, so native
+    // inheritance is evaluated in the correct context. Do not change owner or
+    // group or acquire privileges to force an otherwise unsupported policy.
     final prepared = readHandlePolicy(stage, arena, path);
-    final present = arena<Int32>();
-    final defaulted = arena<Int32>();
     if (!original.sameIdentities(prepared)) {
       throw SettingsYamlException('Cannot safely reproduce the existing '
           'owner or group; destination unchanged: $path');
@@ -457,44 +564,33 @@ final class _Windows {
       throw SettingsYamlException('Cannot safely reproduce the existing '
           'access-SACL policy; destination unchanged: $path');
     }
-    // Align protection explicitly: ReplaceFileW promises the original DACL,
-    // but does not promise to copy every descriptor control bit. An unprotected
-    // stage remains private: its parent has no inheritable ACEs, and the caller
-    // verifies the effective stage DACL again before closing/replacement.
-    final currentSd = arena<Pointer<Void>>();
-    final current =
-        getSecurity(stage, 1, 4, nullptr, nullptr, nullptr, nullptr, currentSd);
-    if (current != 0) {
-      fail('Read staging DACL protection', path, current);
-    }
-    arena.onReleaseAll(() => localFree(currentSd.value));
-    final control = arena<Uint16>();
-    final revision = arena<Uint32>();
-    if (getControl(currentSd.value, control, revision) == 0) {
-      fail('Read staging DACL control', path);
-    }
-    if ((control.value & 0x1000) != (original.control & 0x1000)) {
-      final privateDacl = arena<Pointer<Void>>();
-      if (getDacl(privateDescriptor, present, privateDacl, defaulted) == 0) {
-        fail('Read private staging DACL', path);
+    Pointer<Void> dacl = nullptr;
+    final entries = original.dacl;
+    if (entries != null) {
+      final length = 8 + entries.fold<int>(0, (sum, ace) => sum + ace.length);
+      dacl = arena<Uint8>(length).cast<Void>();
+      // ACL_REVISION_DS also supports ordinary ACEs. Preserve the ordered raw
+      // ACE bytes, including every inherited flag, using native ACL routines.
+      if (initializeAcl(dacl, length, 4) == 0) {
+        fail('Initialize destination DACL', path);
       }
-      if (present.value == 0 || privateDacl.value == nullptr) {
-        throw SettingsYamlException('Private staging DACL is missing: $path');
-      }
-      final protection =
-          original.control & 0x1000 != 0 ? 0x80000000 : 0x20000000;
-      final applied = setSecurity(stage, 1, 4 | protection, nullptr, nullptr,
-          privateDacl.value, nullptr);
-      if (applied != 0) {
-        fail('Prepare staging DACL protection', path, applied);
-      }
-      final checked = readHandlePolicy(stage, arena, path);
-      if (!original.sameIdentities(checked) ||
-          !original.sameAccessSacl(checked)) {
-        throw SettingsYamlException('Cannot safely prepare Windows access '
-            'policy; destination unchanged: $path');
+      for (final entry in entries) {
+        final ace = arena<Uint8>(entry.length);
+        ace.asTypedList(entry.length).setAll(0, entry);
+        if (addAce(dacl, 4, 0xffffffff, ace.cast<Void>(), entry.length) == 0) {
+          fail('Reproduce destination DACL entry', path);
+        }
       }
     }
+    final protection = original.control & 0x1000 != 0 ? 0x80000000 : 0x20000000;
+    final applied =
+        setSecurity(stage, 1, 4 | protection, nullptr, nullptr, dacl, nullptr);
+    if (applied != 0) {
+      fail('Prepare staging access policy', path, applied);
+    }
+    // Any unexpected native transformation rejects this empty stage; never
+    // repair it and continue with secret content.
+    verifyAccessPolicy(original, readHandlePolicy(stage, arena, path), path);
   }
 
   void verifyAccessPolicy(

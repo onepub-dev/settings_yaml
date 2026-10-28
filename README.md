@@ -105,10 +105,22 @@ After flushing the staged POSIX file, a same-filesystem rename replaces the
 destination. The original remains in place on pre-replacement failure. There is
 no copy fallback or deliberate removal of the destination before rename.
 
-On Windows, `CreateDirectoryW` and `CreateFileW` receive an explicit protected
-owner-only DACL at creation; the DACL is checked before writing settings. The stage
-keeps its private DACL until replacement. Existing owner and group must match the
-stage; differing identities fail before replacement. Access-SACL policies, including
+On Windows, `CreateFileW` creates a unique sibling stage directly in the
+destination's parent with `CREATE_NEW`, exclusive sharing and an explicit
+protected owner-only DACL. Its private policy and file identity are checked while
+empty. For an existing destination, the empty stage adopts the original DACL and
+protected/unprotected state under the same parent, then verifies the complete
+access policy. It is closed and reopened with the rights needed for replacement;
+identity and policy are checked again before writing settings. A mismatch or
+denied reopen discards the empty stage and leaves the destination unchanged.
+If the OS also denies empty-stage cleanup, the error reports its path and confirms
+that no content was written.
+Existing owner and group must match the stage; differing identities fail before
+writing. The stage adopts the original reader policy before writing, including
+access for existing authorized readers. Those readers may access staging content
+after its exclusive handle closes and before replacement. Staging is therefore
+not owner-only until commit for existing files. New files retain the private DACL.
+Access-SACL policies, including
 mandatory labels, resource attributes, central access policies, process-trust and
 access-filter ACEs, are currently unsupported and rejected before replacement.
 Even an empty non-null access SACL is rejected: this adapter cannot safely
@@ -120,8 +132,9 @@ contract. Existing encrypted files use
 encrypted staging.
 
 Replacement uses `ReplaceFileW` without ACL-ignore flags, preserving the existing
-DACL through replacement, with a unique recovery backup inside the staging
-directory. After commitment, the adapter verifies owner, group, ordered DACL ACE
+DACL through replacement, with a unique recovery backup in the destination's
+parent. Before writing and through a fresh destination open after commitment,
+the adapter verifies owner, group, ordered DACL ACE
 bytes (including inheritance flags), relevant DACL controls, and that the access
 SACL remains null. SACL control differences are ignored when both queried access SACLs
 are null; introduction of any non-null access SACL fails verification. The only
@@ -136,8 +149,17 @@ On a replacement error or post-commit verification failure, the exception report
 destination and recovery paths and all recovery artifacts are retained. The
 original may already have moved; a verification failure is not a rollback and
 cannot guarantee that the old policy remains active. Inspect those paths before
-manual recovery. New files use a same-volume move that does not overwrite an
+manual recovery. Recovery policy is checked independently, including when the
+fresh destination open fails; an unavailable or unverifiable backup is reported.
+New files use a same-volume move that does not overwrite an
 unexpectedly existing destination.
+
+The sibling-stage approach remains unproven on native Windows. Release requires
+native inherited and mixed explicit/inherited ACL tests, parent grants and
+revocations, actual access checks with a nonowner token, and failure/recovery
+validation. Linux tests cannot establish these Windows guarantees. Policies that
+deny the rights required to reopen or replace a file can fail even when ordinary
+in-place writing would be allowed; there is no in-place fallback.
 
 Existing `.bak` files are untouched. On POSIX, atomic replacement keeps the old
 file available until commit, replacing the former move-to-`.bak` recovery scheme.

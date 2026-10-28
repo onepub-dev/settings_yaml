@@ -194,7 +194,9 @@ class SettingsYaml {
   double asDouble(String key, {double defaultValue = 0.0}) =>
       validDouble(key) ? valueMap[key] as double : defaultValue;
 
-  /// Saves validated settings using a private same-directory staging area.
+  /// Saves validated settings using checked same-directory staging.
+  /// Windows replacement stages adopt the original reader policy
+  /// before writing.
   /// The directory must be trusted; concurrent writers and
   /// hostile path changes are unsupported. The original remains until rename.
   /// Existing .bak files are untouched. See README for permissions and limits.

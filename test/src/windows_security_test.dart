@@ -46,7 +46,12 @@ void main() {
       expect(temporary.listSync(), isEmpty);
     });
 
-    for (final kind in ['inherited', 'explicit unprotected', 'protected']) {
+    for (final kind in [
+      'inherited',
+      'mixed explicit/inherited',
+      'explicit unprotected',
+      'protected'
+    ]) {
       test('$kind DACL survives first and repeated saves in both query views',
           () {
         native.configure(temporary.path, path, kind);
@@ -55,7 +60,12 @@ void main() {
         expect(before.sacl, isNull,
             reason: 'ordinary files have no queried access SACL');
         expect(before.control & 0x1000, kind == 'protected' ? 0x1000 : 0);
-        expect(_hasInherited(before), kind == 'inherited');
+        expect(_hasInherited(before),
+            kind == 'inherited' || kind == 'mixed explicit/inherited');
+        if (kind == 'mixed explicit/inherited') {
+          expect(before.dacl!.any((ace) => ace[1] & 0x10 == 0), isTrue,
+              reason: 'mixed fixture must retain an explicit ACE');
+        }
         for (final content in ['new', 'updated']) {
           secureSaveWindows(path, content);
           _expectPreserved(before, native.queryMatrix(path));
@@ -68,7 +78,9 @@ void main() {
         native.configure(temporary.path, path, kind);
         final unsaved = p.join(temporary.path, 'unsaved');
         File(unsaved).writeAsStringSync('old');
-        if (kind != 'inherited') {
+        if (kind == 'mixed explicit/inherited') {
+          native.setDacl(unsaved, 'D:(A;;FR;;;SY)', protected: false);
+        } else if (kind != 'inherited') {
           native.setDacl(
               unsaved, 'D:${kind == 'protected' ? 'P' : ''}(A;;FA;;;OW)',
               protected: kind == 'protected');
@@ -77,7 +89,9 @@ void main() {
         secureSaveWindows(path, 'new');
         secureSaveWindows(path, 'updated');
         final parentBase =
-            kind == 'inherited' ? '(A;OICI;FA;;;OW)' : '(A;;FA;;;OW)';
+            kind == 'inherited' || kind == 'mixed explicit/inherited'
+                ? '(A;OICI;FA;;;OW)'
+                : '(A;;FA;;;OW)';
         // SetNamedSecurityInfo uses modern automatic propagation. No token
         // privileges are enabled; the test owns this temporary directory.
         native.setDacl(temporary.path, 'D:P$parentBase(A;OICI;FR;;;WD)');
@@ -169,6 +183,61 @@ void main() {
       secureSaveWindows(path, 'updated');
       _expectPreserved(created, native.queryMatrix(path));
       expect(File(path).readAsStringSync(), 'updated');
+    });
+
+    test('reopening rights are checked before staging secrets', () {
+      native.setDacl(temporary.path, 'D:P(A;;FA;;;OW)');
+      File(path).writeAsStringSync('old');
+      File('$path.bak').writeAsStringSync('unrelated');
+      // OWNER RIGHTS removes the owner's implicit WRITE_DAC grant. Ordinary
+      // read/write/delete remain permitted; replacement needs WRITE_DAC too.
+      native.setDacl(path, 'D:P(D;;WD;;;OW)(A;;FA;;;OW)');
+      final before = native.queryMatrix(path);
+      expect(native.canOpen(path, 0x80000000 | 0x40000000 | 0x10000), isTrue);
+      expect(native.canOpen(path, 0x40000), isFalse);
+      expect(
+          () => secureSaveWindows(path, 'secret-not-for-errors'),
+          throwsA(isA<SettingsYamlException>().having(
+              (error) => error.toString(),
+              'prewrite error',
+              allOf(
+                  contains('Reopen empty staging file failed'),
+                  isNot(contains('Replacement committed')),
+                  isNot(contains('secret-not-for-errors'))))));
+      _expectPreserved(before, native.queryMatrix(path), allowAi: false);
+      expect(File(path).readAsStringSync(), 'old');
+      expect(File('$path.bak').readAsStringSync(), 'unrelated');
+      expect(temporary.listSync().map((entry) => p.basename(entry.path)),
+          unorderedEquals(['settings.yaml', 'settings.yaml.bak']));
+    });
+
+    test('legacy policy mismatch under broad parent rejects empty stage', () {
+      native.setDacl(temporary.path, 'D:P(A;OICI;FA;;;OW)(A;OICI;FR;;;WD)');
+      File(path).writeAsStringSync('old');
+      File('$path.bak').writeAsStringSync('unrelated');
+      // The legacy setter can leave an unprotected explicit-only descriptor.
+      // Modern stage preparation must inherit the parent's broad reader ACE;
+      // that is a policy mismatch, never permission to publish the secret.
+      native.setLegacyDacl(path, 'D:(A;;FA;;;OW)', protected: false);
+      final before = native.read(path);
+      expect(before.control & 0x1000, 0);
+      expect(_hasInherited(before), isFalse);
+      expect(native.sddl(path), isNot(contains(';;;WD)')));
+      expect(
+          () => secureSaveWindows(path, 'secret-not-for-errors'),
+          throwsA(isA<SettingsYamlException>().having(
+              (error) => error.toString(),
+              'prewrite error',
+              allOf(
+                  contains(
+                      'Windows did not preserve the existing access policy'),
+                  isNot(contains('Replacement committed')),
+                  isNot(contains('secret-not-for-errors'))))));
+      _expectPreserved(before, native.read(path), allowAi: false);
+      expect(File(path).readAsStringSync(), 'old');
+      expect(File('$path.bak').readAsStringSync(), 'unrelated');
+      expect(temporary.listSync().map((entry) => p.basename(entry.path)),
+          unorderedEquals(['settings.yaml', 'settings.yaml.bak']));
     });
 
     test(
@@ -375,9 +444,13 @@ final class _SecurityFixture {
       setDacl(directory, inherited ? 'D:P(A;OICI;FA;;;OW)' : 'D:P(A;;FA;;;OW)');
     }
 
-    nativeParent(inherited: kind == 'inherited');
+    nativeParent(
+        inherited: kind == 'inherited' || kind == 'mixed explicit/inherited');
     File(path).writeAsStringSync('old');
-    if (kind == 'inherited') {
+    if (kind == 'mixed explicit/inherited') {
+      setDacl(path, 'D:(A;;FR;;;SY)', protected: false);
+      nativeParent(inherited: true);
+    } else if (kind == 'inherited') {
       // Reapply the parent after creation to exercise automatic propagation.
       nativeParent(inherited: true);
     } else {
@@ -385,6 +458,18 @@ final class _SecurityFixture {
           protected: kind == 'protected');
     }
   }
+
+  bool canOpen(String path, int access) => using((arena) {
+        final handle = open(path.toNativeUtf16(allocator: arena), access, 0,
+            nullptr, 3, 0x200000, nullptr);
+        if (handle.address == -1 ||
+            handle.address == 0xffffffff ||
+            handle.address == 0xffffffffffffffff) {
+          return false;
+        }
+        expect(close(handle), isNot(0));
+        return true;
+      });
 
   List<WindowsAccessPolicy> queryViews(String path) => [
         read(path),
