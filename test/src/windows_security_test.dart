@@ -48,10 +48,15 @@ void main() {
     test('preserves owner, group and ordinary inherited DACL', () {
       File(path).writeAsStringSync('old');
       final before = native.snapshot(path);
+      final control = native.daclControl(path);
       expect(before, contains(';ID;'));
-      secureSaveWindows(path, 'new');
-      expect(File(path).readAsStringSync(), 'new');
-      expect(native.snapshot(path), before);
+      expect(control & 0x1000, 0);
+      for (final content in ['new', 'updated']) {
+        secureSaveWindows(path, content);
+        expect(File(path).readAsStringSync(), content);
+        expect(native.snapshot(path), before);
+        expect(native.daclControl(path), control);
+      }
     });
 
     test('preserves protected DACL with a reader ACE and unrelated backup', () {
@@ -59,12 +64,17 @@ void main() {
       File('$path.bak').writeAsStringSync('unrelated');
       native.setDacl(path, 'D:P(A;;FA;;;OW)(A;;FR;;;WD)');
       final before = native.snapshot(path);
+      final control = native.daclControl(path);
       expect(before, contains('D:P'));
       expect(before, contains(';;;WD)'));
-      secureSaveWindows(path, 'new');
-      expect(File(path).readAsStringSync(), 'new');
-      expect(native.snapshot(path), before);
-      expect(File('$path.bak').readAsStringSync(), 'unrelated');
+      expect(control & 0x1000, 0x1000);
+      for (final content in ['new', 'updated']) {
+        secureSaveWindows(path, content);
+        expect(File(path).readAsStringSync(), content);
+        expect(native.snapshot(path), before);
+        expect(native.daclControl(path), control);
+        expect(File('$path.bak').readAsStringSync(), 'unrelated');
+      }
     });
 
     test('new files exclude permissive inherited parent ACEs', () {
@@ -188,6 +198,25 @@ final class _SecurityFixture {
           Pointer<Void>)>('CreateFileW');
   late final close = kernel.lookupFunction<Int32 Function(Pointer<Void>),
       int Function(Pointer<Void>)>('CloseHandle');
+  late final control = security.lookupFunction<
+      Int32 Function(Pointer<Void>, Pointer<Uint16>, Pointer<Uint32>),
+      int Function(Pointer<Void>, Pointer<Uint16>,
+          Pointer<Uint32>)>('GetSecurityDescriptorControl');
+
+  int daclControl(String path) => using((arena) {
+        final descriptor = arena<Pointer<Void>>();
+        expect(
+            get(path.toNativeUtf16(allocator: arena), 1, 4, nullptr, nullptr,
+                nullptr, nullptr, descriptor),
+            0);
+        arena.onReleaseAll(() => free(descriptor.value));
+        final value = arena<Uint16>();
+        final revision = arena<Uint32>();
+        expect(control(descriptor.value, value, revision), isNot(0));
+        // Include present/defaulted, auto-inherit request, auto-inherited and
+        // protected bits, not just the subset represented by SDDL formatting.
+        return value.value & 0x150c;
+      });
 
   String snapshot(String path) => using((arena) {
         final descriptor = arena<Pointer<Void>>();

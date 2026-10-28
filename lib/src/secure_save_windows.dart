@@ -119,8 +119,10 @@ void secureSaveWindows(String absolutePath, String content) {
         }
         if (original != null) {
           api
-            ..prepareAccessPolicy(original, handle, arena, absolutePath)
-            ..verifyPrivate(handle, descriptor.value, arena, stage);
+            ..prepareAccessPolicy(
+                original, handle, descriptor.value, arena, absolutePath)
+            ..verifyPrivate(handle, descriptor.value, arena, stage,
+                protected: original.control & 0x1000 != 0);
         }
         // ReplaceFile opens the replacement without sharing; close first.
         if (api.close(handle) == 0) {
@@ -343,7 +345,8 @@ final class _Windows {
   }
 
   void verifyPrivate(
-      Pointer<Void> handle, Pointer<Void> expected, Arena arena, String path) {
+      Pointer<Void> handle, Pointer<Void> expected, Arena arena, String path,
+      {bool protected = true}) {
     final actualDacl = arena<Pointer<Void>>();
     final sd = arena<Pointer<Void>>();
     final result =
@@ -363,8 +366,10 @@ final class _Windows {
     if (getControl(sd.value, control, revision) == 0) {
       fail('Read private staging security control', path);
     }
-    if (!sameAcl(expectedDacl.value, actualDacl.value) ||
-        control.value & 0x1000 == 0) {
+    if (present.value == 0 ||
+        expectedDacl.value == nullptr ||
+        !sameAcl(expectedDacl.value, actualDacl.value) ||
+        (control.value & 0x1000 != 0) != protected) {
       throw SettingsYamlException('Filesystem did not apply private staging '
           'ACL: $path');
     }
@@ -425,19 +430,15 @@ final class _Windows {
     }
   }
 
-  void prepareAccessPolicy(
-      _AccessPolicy original, Pointer<Void> stage, Arena arena, String path) {
+  void prepareAccessPolicy(_AccessPolicy original, Pointer<Void> stage,
+      Pointer<Void> privateDescriptor, Arena arena, String path) {
     // ReplaceFileW preserves the original DACL itself. Applying it here would
     // recompute inheritance against the private staging parent and discard ID
-    // flags or add AI. Keep the private creation DACL until replacement.
-    // Owner/group and mandatory labels are not promised by ReplaceFileW, so
-    // prepare these while the file is still inside the private directory.
-    final applied = setSecurity(stage, 1, 3 | original.accessSaclFlags,
-        original.owner, original.group, nullptr, original.sacl);
-    if (applied != 0) {
-      fail(
-          'Preserve destination owner, group and access labels', path, applied);
-    }
+    // flags or add AI. Keep the private ACEs until replacement.
+    // OWNER RIGHTS follows the current owner. Changing ownership here could
+    // grant another principal access to secret staging bytes or prevent us
+    // reopening the file for ReplaceFileW. Fail closed for differing identities
+    // rather than changing them or enabling privileges.
     final owner = arena<Pointer<Void>>();
     final group = arena<Pointer<Void>>();
     final sd = arena<Pointer<Void>>();
@@ -454,10 +455,70 @@ final class _Windows {
       fail('Verify staging access labels', path);
     }
     if (equalSid(original.owner, owner.value) == 0 ||
-        equalSid(original.group, group.value) == 0 ||
-        !sameAcl(original.sacl, sacl.value)) {
-      throw SettingsYamlException('Windows did not reproduce the existing '
-          'owner, group or access labels; destination unchanged: $path');
+        equalSid(original.group, group.value) == 0) {
+      throw SettingsYamlException('Cannot safely reproduce the existing '
+          'owner or group; destination unchanged: $path');
+    }
+    // Do not assume an owner/group-only SetSecurityInfo call leaves DACL
+    // control intact. Avoid rewriting identities or labels that already match.
+    if (!sameAcl(original.sacl, sacl.value)) {
+      if (original.accessSaclFlags == 0) {
+        throw SettingsYamlException('Cannot safely reproduce the existing '
+            'access labels; destination unchanged: $path');
+      }
+      final applied = setSecurity(stage, 1, original.accessSaclFlags, nullptr,
+          nullptr, nullptr, original.sacl);
+      if (applied != 0) {
+        fail('Preserve destination access labels', path, applied);
+      }
+      final checkedSd = arena<Pointer<Void>>();
+      final checked = getSecurity(
+          stage, 1, 0x1f7, owner, group, nullptr, nullptr, checkedSd);
+      if (checked != 0) {
+        fail('Verify prepared staging access policy', path, checked);
+      }
+      arena.onReleaseAll(() => localFree(checkedSd.value));
+      if (getSacl(checkedSd.value, present, sacl, defaulted) == 0) {
+        fail('Verify prepared staging access labels', path);
+      }
+      if (equalSid(original.owner, owner.value) == 0 ||
+          equalSid(original.group, group.value) == 0 ||
+          !sameAcl(original.sacl, sacl.value)) {
+        throw SettingsYamlException('Windows did not reproduce the existing '
+            'owner, group or access labels; destination unchanged: $path');
+      }
+    }
+    // Align protection explicitly: ReplaceFileW promises the original DACL,
+    // but does not promise to copy every descriptor control bit. An unprotected
+    // stage remains private: its parent has no inheritable ACEs, and the caller
+    // verifies the effective stage DACL again before closing/replacement.
+    final currentSd = arena<Pointer<Void>>();
+    final current =
+        getSecurity(stage, 1, 4, nullptr, nullptr, nullptr, nullptr, currentSd);
+    if (current != 0) {
+      fail('Read staging DACL protection', path, current);
+    }
+    arena.onReleaseAll(() => localFree(currentSd.value));
+    final control = arena<Uint16>();
+    final revision = arena<Uint32>();
+    if (getControl(currentSd.value, control, revision) == 0) {
+      fail('Read staging DACL control', path);
+    }
+    if ((control.value & 0x1000) != (original.control & 0x1000)) {
+      final privateDacl = arena<Pointer<Void>>();
+      if (getDacl(privateDescriptor, present, privateDacl, defaulted) == 0) {
+        fail('Read private staging DACL', path);
+      }
+      if (present.value == 0 || privateDacl.value == nullptr) {
+        throw SettingsYamlException('Private staging DACL is missing: $path');
+      }
+      final protection =
+          original.control & 0x1000 != 0 ? 0x80000000 : 0x20000000;
+      final applied = setSecurity(stage, 1, 4 | protection, nullptr, nullptr,
+          privateDacl.value, nullptr);
+      if (applied != 0) {
+        fail('Prepare staging DACL protection', path, applied);
+      }
     }
   }
 
