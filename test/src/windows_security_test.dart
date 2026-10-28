@@ -5,6 +5,7 @@ import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
 import 'package:settings_yaml/settings_yaml.dart';
 import 'package:settings_yaml/src/secure_save_windows.dart';
+import 'package:settings_yaml/src/windows_access_policy.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -23,12 +24,12 @@ void main() {
     test(
         'first native save creates missing file and preserves unrelated backup',
         () {
-      // Keep this before fixture calls: lazy GetLastError resolution used to
-      // erase ERROR_FILE_NOT_FOUND on the first GetFileAttributesW failure.
+      // Before fixture calls: lazy GetLastError resolution once erased the
+      // first GetFileAttributesW ERROR_FILE_NOT_FOUND result.
       File('$path.bak').writeAsStringSync('unrelated');
       secureSaveWindows(path, 'secret');
       expect(File(path).readAsStringSync(), 'secret');
-      expect(native.snapshot(path), contains('D:P(A;;FA;;;OW)'));
+      expect(native.sddl(path), contains('D:P(A;;FA;;;OW)'));
       expect(File('$path.bak').readAsStringSync(), 'unrelated');
       expect(temporary.listSync().map((entry) => p.basename(entry.path)),
           unorderedEquals(['settings.yaml', 'settings.yaml.bak']));
@@ -45,35 +46,112 @@ void main() {
       expect(temporary.listSync(), isEmpty);
     });
 
-    test('preserves owner, group and ordinary inherited DACL', () {
-      File(path).writeAsStringSync('old');
-      final before = native.snapshot(path);
-      final control = native.daclControl(path);
-      expect(before, contains(';ID;'));
-      expect(control & 0x1000, 0);
-      for (final content in ['new', 'updated']) {
-        native.saveWithDiagnostics(path, content);
-        expect(File(path).readAsStringSync(), content);
-        expect(native.snapshot(path), before);
-        expect(native.daclControl(path), control);
-      }
-    });
+    for (final kind in ['inherited', 'explicit unprotected', 'protected']) {
+      test('$kind DACL survives first and repeated saves in both query views',
+          () {
+        native.configure(temporary.path, path, kind);
+        File('$path.bak').writeAsStringSync('unrelated');
+        final before = native.queryMatrix(path);
+        expect(before.control & 0x1000, kind == 'protected' ? 0x1000 : 0);
+        expect(_hasInherited(before), kind == 'inherited');
+        for (final content in ['new', 'updated']) {
+          secureSaveWindows(path, content);
+          _expectPreserved(before, native.queryMatrix(path));
+          expect(File(path).readAsStringSync(), content);
+          expect(File('$path.bak').readAsStringSync(), 'unrelated');
+        }
+      });
 
-    test('preserves protected DACL with a reader ACE and unrelated backup', () {
+      test('$kind saved and unsaved files follow parent grant and removal', () {
+        native.configure(temporary.path, path, kind);
+        final unsaved = p.join(temporary.path, 'unsaved');
+        File(unsaved).writeAsStringSync('old');
+        if (kind != 'inherited') {
+          native.setDacl(
+              unsaved, 'D:${kind == 'protected' ? 'P' : ''}(A;;FA;;;OW)',
+              protected: kind == 'protected');
+        }
+        _expectPreserved(native.queryMatrix(path), native.queryMatrix(unsaved));
+        secureSaveWindows(path, 'new');
+        secureSaveWindows(path, 'updated');
+        final parentBase =
+            kind == 'inherited' ? '(A;OICI;FA;;;OW)' : '(A;;FA;;;OW)';
+        // SetNamedSecurityInfo uses modern automatic propagation. No token
+        // privileges are enabled; the test owns this temporary directory.
+        native.setDacl(temporary.path, 'D:P$parentBase(A;OICI;FR;;;WD)');
+        final granted = native.queryMatrix(path);
+        _expectPreserved(granted, native.queryMatrix(unsaved));
+        expect(native.sddl(path).contains(';;;WD)'), kind != 'protected');
+        expect(granted.control & 0x1000, kind == 'protected' ? 0x1000 : 0);
+        if (kind != 'protected') {
+          expect(_hasInherited(granted), isTrue);
+        }
+        native.setDacl(temporary.path, 'D:P$parentBase');
+        final revoked = native.queryMatrix(path);
+        _expectPreserved(revoked, native.queryMatrix(unsaved));
+        expect(native.sddl(path), isNot(contains(';;;WD)')));
+        expect(revoked.control & 0x1000, kind == 'protected' ? 0x1000 : 0);
+        expect(File(path).readAsStringSync(), 'updated');
+        expect(File(unsaved).readAsStringSync(), 'old');
+      });
+    }
+
+    for (final protected in [false, true]) {
+      test('legacy protected=$protected permits only forward AI normalization',
+          () {
+        native.setDacl(temporary.path, 'D:P(A;;FA;;;OW)');
+        final unsaved = p.join(temporary.path, 'unsaved');
+        for (final fixture in [path, unsaved]) {
+          File(fixture).writeAsStringSync('old');
+          native.setLegacyDacl(fixture, 'D:${protected ? 'P' : ''}(A;;FA;;;OW)',
+              protected: protected);
+          expect(native.read(fixture).control & 0x400, 0,
+              reason: 'fixture must exercise the legacy AI=false state');
+          expect(_hasInherited(native.read(fixture)), isFalse);
+        }
+        // Keep independent baselines for each query API/mask. Unlike the
+        // modern matrix, this does not assume legacy query views agree.
+        final before = native.queryViews(path);
+        expect(native.read(path).control & 0x400, 0,
+            reason: 'named queries must not change the legacy raw descriptor');
+        for (final content in ['new', 'updated']) {
+          secureSaveWindows(path, content);
+          final after = native.queryViews(path);
+          for (var i = 0; i < before.length; i++) {
+            _expectPreserved(before[i], after[i], reason: 'legacy view $i');
+          }
+          expect(after.first.control & 0x400, 0x400,
+              reason: 'exercise the observed ReplaceFileW normalization');
+          expect(File(path).readAsStringSync(), content);
+        }
+        expect(native.read(unsaved).control & 0x400, 0);
+        for (final grant in [true, false]) {
+          native.setDacl(temporary.path,
+              'D:P(A;;FA;;;OW)${grant ? '(A;OICI;FR;;;WD)' : ''}');
+          final savedViews = native.queryViews(path);
+          final unsavedViews = native.queryViews(unsaved);
+          for (var i = 0; i < savedViews.length; i++) {
+            // Protection can leave the unsaved legacy file at AI=false.
+            // Still compare every ACE, flag and other control exactly.
+            _expectPreserved(unsavedViews[i], savedViews[i],
+                reason: 'parent grant=$grant, legacy view $i');
+          }
+          expect(native.sddl(path).contains(';;;WD)'), grant && !protected);
+          expect(savedViews.first.control & 0x1000, protected ? 0x1000 : 0);
+        }
+        expect(File(unsaved).readAsStringSync(), 'old');
+      });
+    }
+
+    test('protected DACL retains an explicit reader ACE on repeated saves', () {
       File(path).writeAsStringSync('old');
-      File('$path.bak').writeAsStringSync('unrelated');
       native.setDacl(path, 'D:P(A;;FA;;;OW)(A;;FR;;;WD)');
-      final before = native.snapshot(path);
-      final control = native.daclControl(path);
-      expect(before, contains('D:P'));
-      expect(before, contains(';;;WD)'));
-      expect(control & 0x1000, 0x1000);
+      final before = native.queryMatrix(path);
+      expect(native.sddl(path), contains(';;;WD)'));
       for (final content in ['new', 'updated']) {
-        native.saveWithDiagnostics(path, content);
+        secureSaveWindows(path, content);
+        _expectPreserved(before, native.queryMatrix(path));
         expect(File(path).readAsStringSync(), content);
-        expect(native.snapshot(path), before);
-        expect(native.daclControl(path), control);
-        expect(File('$path.bak').readAsStringSync(), 'unrelated');
       }
     });
 
@@ -81,28 +159,56 @@ void main() {
       native.setDacl(temporary.path, 'D:P(A;OICI;FA;;;OW)(A;OICI;FR;;;WD)');
       final inherited = File(p.join(temporary.path, 'inherited'))
         ..writeAsStringSync('fixture');
-      expect(native.snapshot(inherited.path), contains(';;;WD)'));
+      expect(native.sddl(inherited.path), contains(';;;WD)'));
       secureSaveWindows(path, 'secret');
-      final created = native.snapshot(path);
-      expect(created, contains('D:P(A;;FA;;;OW)'));
-      expect(created, isNot(contains(';;;WD)')));
-      // A second save must also work with the generated OWNER RIGHTS policy.
-      native.saveWithDiagnostics(path, 'updated');
-      expect(native.snapshot(path), created);
+      final created = native.queryMatrix(path);
+      expect(native.sddl(path), contains('D:P(A;;FA;;;OW)'));
+      expect(native.sddl(path), isNot(contains(';;;WD)')));
+      secureSaveWindows(path, 'updated');
+      _expectPreserved(created, native.queryMatrix(path));
       expect(File(path).readAsStringSync(), 'updated');
+    });
+
+    test(
+        'mandatory label rejects before replacement '
+        'without artifacts or details', () {
+      File(path).writeAsStringSync('old');
+      File('$path.bak').writeAsStringSync('unrelated');
+      // An owner may lower the integrity level without enabling privileges.
+      // Do not skip: a native runner must exercise a real nonempty access SACL.
+      native.setLabel(path, 'S:(ML;;NW;;;LW)');
+      final before = native.read(path);
+      expect(before.sacl, isNotEmpty);
+      expect(before.sacl!.any((ace) => ace[0] == 0x11), isTrue);
+      expect(
+          () => secureSaveWindows(path, 'secret-not-for-errors'),
+          throwsA(isA<SettingsYamlException>().having(
+              (error) => error.toString(),
+              'precommit error',
+              allOf(
+                  contains('access-SACL policy; destination unchanged'),
+                  isNot(contains('Replacement committed')),
+                  isNot(contains('secret-not-for-errors')),
+                  isNot(contains('ML;')),
+                  isNot(contains('S-1-'))))));
+      _expectPreserved(before, native.read(path));
+      expect(File(path).readAsStringSync(), 'old');
+      expect(File('$path.bak').readAsStringSync(), 'unrelated');
+      expect(temporary.listSync().map((entry) => p.basename(entry.path)),
+          unorderedEquals(['settings.yaml', 'settings.yaml.bak']));
     });
 
     test('read-only destination fails without changing it or unrelated backup',
         () {
       File(path).writeAsStringSync('old');
       File('$path.bak').writeAsStringSync('unrelated');
-      final before = native.snapshot(path);
+      final before = native.read(path);
       native.setAttributes(path, 0x81);
       try {
         expect(() => secureSaveWindows(path, 'new'),
             throwsA(isA<SettingsYamlException>()));
         expect(File(path).readAsStringSync(), 'old');
-        expect(native.snapshot(path), before);
+        _expectPreserved(before, native.read(path));
         expect(File('$path.bak').readAsStringSync(), 'unrelated');
       } finally {
         native.setAttributes(path, 0x80);
@@ -113,7 +219,7 @@ void main() {
         () {
       File(path).writeAsStringSync('old');
       File('$path.bak').writeAsStringSync('unrelated');
-      final before = native.snapshot(path);
+      final before = native.read(path);
       final handle = native.lock(path);
       try {
         expect(() => secureSaveWindows(path, 'new'),
@@ -122,7 +228,7 @@ void main() {
         expect(native.close(handle), isNot(0));
       }
       expect(File(path).readAsStringSync(), 'old');
-      expect(native.snapshot(path), before);
+      _expectPreserved(before, native.read(path));
       expect(File('$path.bak').readAsStringSync(), 'unrelated');
     });
 
@@ -148,48 +254,26 @@ void main() {
   }, skip: !Platform.isWindows ? 'Requires native Windows ACL APIs.' : false);
 }
 
-/// Native fixture operations avoid localized icacls output and shell quoting.
-final class _SecurityFixture {
-  var _reportedPolicyFailure = false;
+bool _hasInherited(WindowsAccessPolicy policy) =>
+    policy.dacl!.any((ace) => ace[1] & 0x10 != 0);
 
-  // Only synthetic fixtures use this wrapper. Never add ACLs or SIDs to the
-  // production exception: a real settings file can contain private policy.
-  void saveWithDiagnostics(String path, String content) {
-    _PolicyDiagnostic? before;
-    String? beforeError;
-    try {
-      before = policyDiagnostic(path);
-    } on Object catch (error) {
-      // Diagnostic collection must not prevent exercising the real save.
-      beforeError = _diagnosticError(error);
-    }
-    try {
-      secureSaveWindows(path, content);
-    } on SettingsYamlException catch (error) {
-      if (!_reportedPolicyFailure &&
-          error.toString().contains(
-              'Replacement committed, but access policy verification failed')) {
-        _reportedPolicyFailure = true;
-        try {
-          if (before == null) {
-            print('Synthetic Windows policy: before snapshot unavailable: '
-                '$beforeError');
-          } else {
-            before.reportDifference(policyDiagnostic(path));
-          }
-        } on Object catch (error) {
-          print('Synthetic Windows policy: diagnostic collection failed: '
-              '${_diagnosticError(error)}');
-        }
-      }
-      rethrow;
-    }
+// An independent assertion oracle, not a call back into preservedBy().
+void _expectPreserved(WindowsAccessPolicy before, WindowsAccessPolicy after,
+    {bool allowAi = true, String? reason}) {
+  expect(after.owner, before.owner, reason: reason);
+  expect(after.group, before.group, reason: reason);
+  expect(after.dacl, before.dacl, reason: reason);
+  expect(after.sacl, before.sacl, reason: reason);
+  expect(after.control & 0x3b3c, before.control & 0x3b3c, reason: reason);
+  if (!allowAi || before.control & 0x400 != 0) {
+    expect(after.control & 0x400, before.control & 0x400, reason: reason);
   }
+}
 
+/// Native fixtures avoid localized tools, shell quoting and enabled privileges.
+final class _SecurityFixture {
   final kernel = DynamicLibrary.open('kernel32.dll');
   final security = DynamicLibrary.open('advapi32.dll');
-  late final lastError =
-      kernel.lookupFunction<Uint32 Function(), int Function()>('GetLastError');
   late final free = kernel.lookupFunction<Pointer<Void> Function(Pointer<Void>),
       Pointer<Void> Function(Pointer<Void>)>('LocalFree');
   late final get = security.lookupFunction<
@@ -211,36 +295,7 @@ final class _SecurityFixture {
           Pointer<Pointer<Void>>,
           Pointer<Pointer<Void>>,
           Pointer<Pointer<Void>>)>('GetNamedSecurityInfoW');
-  late final stringify = security.lookupFunction<
-          Int32 Function(Pointer<Void>, Uint32, Uint32, Pointer<Pointer<Utf16>>,
-              Pointer<Uint32>),
-          int Function(Pointer<Void>, int, int, Pointer<Pointer<Utf16>>,
-              Pointer<Uint32>)>(
-      'ConvertSecurityDescriptorToStringSecurityDescriptorW');
-  late final parse = security.lookupFunction<
-          Int32 Function(
-              Pointer<Utf16>, Uint32, Pointer<Pointer<Void>>, Pointer<Uint32>),
-          int Function(
-              Pointer<Utf16>, int, Pointer<Pointer<Void>>, Pointer<Uint32>)>(
-      'ConvertStringSecurityDescriptorToSecurityDescriptorW');
-  late final set = security.lookupFunction<
-      Int32 Function(Pointer<Utf16>, Uint32, Pointer<Void>),
-      int Function(Pointer<Utf16>, int, Pointer<Void>)>('SetFileSecurityW');
-  late final attributes = kernel.lookupFunction<
-      Int32 Function(Pointer<Utf16>, Uint32),
-      int Function(Pointer<Utf16>, int)>('SetFileAttributesW');
-  late final open = kernel.lookupFunction<
-      Pointer<Void> Function(Pointer<Utf16>, Uint32, Uint32, Pointer<Void>,
-          Uint32, Uint32, Pointer<Void>),
-      Pointer<Void> Function(Pointer<Utf16>, int, int, Pointer<Void>, int, int,
-          Pointer<Void>)>('CreateFileW');
-  late final close = kernel.lookupFunction<Int32 Function(Pointer<Void>),
-      int Function(Pointer<Void>)>('CloseHandle');
-  late final control = security.lookupFunction<
-      Int32 Function(Pointer<Void>, Pointer<Uint16>, Pointer<Uint32>),
-      int Function(Pointer<Void>, Pointer<Uint16>,
-          Pointer<Uint32>)>('GetSecurityDescriptorControl');
-  late final getHandleSecurity = security.lookupFunction<
+  late final getHandle = security.lookupFunction<
       Uint32 Function(
           Pointer<Void>,
           Uint32,
@@ -259,108 +314,162 @@ final class _SecurityFixture {
           Pointer<Pointer<Void>>,
           Pointer<Pointer<Void>>,
           Pointer<Pointer<Void>>)>('GetSecurityInfo');
+  late final setNamed = security.lookupFunction<
+      Uint32 Function(Pointer<Utf16>, Uint32, Uint32, Pointer<Void>,
+          Pointer<Void>, Pointer<Void>, Pointer<Void>),
+      int Function(Pointer<Utf16>, int, int, Pointer<Void>, Pointer<Void>,
+          Pointer<Void>, Pointer<Void>)>('SetNamedSecurityInfoW');
+  late final setFile = security.lookupFunction<
+      Int32 Function(Pointer<Utf16>, Uint32, Pointer<Void>),
+      int Function(Pointer<Utf16>, int, Pointer<Void>)>('SetFileSecurityW');
+  late final stringify = security.lookupFunction<
+          Int32 Function(Pointer<Void>, Uint32, Uint32, Pointer<Pointer<Utf16>>,
+              Pointer<Uint32>),
+          int Function(Pointer<Void>, int, int, Pointer<Pointer<Utf16>>,
+              Pointer<Uint32>)>(
+      'ConvertSecurityDescriptorToStringSecurityDescriptorW');
+  late final parse = security.lookupFunction<
+          Int32 Function(
+              Pointer<Utf16>, Uint32, Pointer<Pointer<Void>>, Pointer<Uint32>),
+          int Function(
+              Pointer<Utf16>, int, Pointer<Pointer<Void>>, Pointer<Uint32>)>(
+      'ConvertStringSecurityDescriptorToSecurityDescriptorW');
+  late final attributes = kernel.lookupFunction<
+      Int32 Function(Pointer<Utf16>, Uint32),
+      int Function(Pointer<Utf16>, int)>('SetFileAttributesW');
+  late final open = kernel.lookupFunction<
+      Pointer<Void> Function(Pointer<Utf16>, Uint32, Uint32, Pointer<Void>,
+          Uint32, Uint32, Pointer<Void>),
+      Pointer<Void> Function(Pointer<Utf16>, int, int, Pointer<Void>, int, int,
+          Pointer<Void>)>('CreateFileW');
+  late final close = kernel.lookupFunction<Int32 Function(Pointer<Void>),
+      int Function(Pointer<Void>)>('CloseHandle');
+  late final control = security.lookupFunction<
+      Int32 Function(Pointer<Void>, Pointer<Uint16>, Pointer<Uint32>),
+      int Function(Pointer<Void>, Pointer<Uint16>,
+          Pointer<Uint32>)>('GetSecurityDescriptorControl');
   late final getSacl = security.lookupFunction<
       Int32 Function(Pointer<Void>, Pointer<Int32>, Pointer<Pointer<Void>>,
           Pointer<Int32>),
       int Function(Pointer<Void>, Pointer<Int32>, Pointer<Pointer<Void>>,
           Pointer<Int32>)>('GetSecurityDescriptorSacl');
+  late final getDacl = security.lookupFunction<
+      Int32 Function(Pointer<Void>, Pointer<Int32>, Pointer<Pointer<Void>>,
+          Pointer<Int32>),
+      int Function(Pointer<Void>, Pointer<Int32>, Pointer<Pointer<Void>>,
+          Pointer<Int32>)>('GetSecurityDescriptorDacl');
   late final getAce = security.lookupFunction<
       Int32 Function(Pointer<Void>, Uint32, Pointer<Pointer<Uint8>>),
       int Function(Pointer<Void>, int, Pointer<Pointer<Uint8>>)>('GetAce');
   late final sidLength = security.lookupFunction<Uint32 Function(Pointer<Void>),
       int Function(Pointer<Void>)>('GetLengthSid');
 
-  _PolicyDiagnostic policyDiagnostic(String path) => using((arena) {
-        // Resolve before any fallible call: lazy symbol lookup can overwrite
-        // the native last-error value this diagnostic is trying to report.
-        lastError();
-        // Match the production query, including access-relevant SACL ACEs;
-        // auditing SACLs are outside the save contract and this diagnostic.
-        final handle = open(path.toNativeUtf16(allocator: arena), 0x20000, 7,
-            nullptr, 3, 0x200000, nullptr);
-        if ([-1, 0xffffffff, 0xffffffffffffffff].contains(handle.address)) {
-          throw StateError('CreateFileW failed (Windows ${lastError()})');
-        }
-        try {
-          final owner = arena<Pointer<Void>>();
-          final group = arena<Pointer<Void>>();
-          final dacl = arena<Pointer<Void>>();
-          final descriptor = arena<Pointer<Void>>();
-          final result = getHandleSecurity(
-              handle, 1, 0x1f7, owner, group, dacl, nullptr, descriptor);
-          if (result != 0) {
-            throw StateError('GetSecurityInfo failed (Windows $result)');
-          }
-          arena.onReleaseAll(() => free(descriptor.value));
-          final sacl = arena<Pointer<Void>>();
-          final present = arena<Int32>();
-          final defaulted = arena<Int32>();
-          final value = arena<Uint16>();
-          final revision = arena<Uint32>();
-          if (getSacl(descriptor.value, present, sacl, defaulted) == 0) {
-            throw StateError('GetSecurityDescriptorSacl failed '
-                '(Windows ${lastError()})');
-          }
-          if (control(descriptor.value, value, revision) == 0) {
-            throw StateError('GetSecurityDescriptorControl failed '
-                '(Windows ${lastError()})');
-          }
-          final text = arena<Pointer<Utf16>>();
-          // SDDL is supplemental: a formatter failure must not discard the
-          // byte-for-byte policy comparison or the descriptor control bits.
-          final String sddl;
-          if (stringify(descriptor.value, 1, 0x1f7, text, nullptr) == 0) {
-            sddl = '(unavailable: '
-                'ConvertSecurityDescriptorToStringSecurityDescriptorW failed '
-                'with Windows ${lastError()})';
-          } else {
-            arena.onReleaseAll(() => free(text.value.cast()));
-            sddl = text.value.toDartString();
-          }
-          String sid(Pointer<Void> pointer) => pointer == nullptr
-              ? 'null'
-              : _hex(pointer.cast<Uint8>().asTypedList(sidLength(pointer)));
-          List<String>? aces(Pointer<Void> acl) {
-            if (acl == nullptr) {
-              return null;
-            }
-            final entries = <String>[];
-            final ace = arena<Pointer<Uint8>>();
-            for (var index = 0; index < acl.cast<Uint16>()[2]; index++) {
-              if (getAce(acl, index, ace) == 0) {
-                throw StateError('GetAce($index) failed '
-                    '(Windows ${lastError()})');
-              }
-              final bytes = ace.value.asTypedList(ace.value.cast<Uint16>()[1]);
-              entries.add('type=${bytes[0]} flags=0x${_hex([bytes[1]])} '
-                  'bytes=${_hex(bytes)}');
-            }
-            return entries;
-          }
+  void configure(String directory, String path, String kind) {
+    // Force modern propagation instead of depending on the runner's temp ACL.
+    void nativeParent({required bool inherited}) {
+      setDacl(directory, inherited ? 'D:P(A;OICI;FA;;;OW)' : 'D:P(A;;FA;;;OW)');
+    }
 
-          return _PolicyDiagnostic(sid(owner.value), sid(group.value),
-              aces(dacl.value), aces(sacl.value), value.value, sddl);
-        } finally {
-          close(handle);
-        }
-      });
+    nativeParent(inherited: kind == 'inherited');
+    File(path).writeAsStringSync('old');
+    if (kind == 'inherited') {
+      // Reapply the parent after creation to exercise automatic propagation.
+      nativeParent(inherited: true);
+    } else {
+      setDacl(path, 'D:${kind == 'protected' ? 'P' : ''}(A;;FA;;;OW)',
+          protected: kind == 'protected');
+    }
+  }
 
-  int daclControl(String path) => using((arena) {
+  List<WindowsAccessPolicy> queryViews(String path) => [
+        read(path),
+        read(path, named: true),
+        read(path, information: 7),
+        read(path, named: true, information: 7),
+      ];
+
+  WindowsAccessPolicy queryMatrix(String path) {
+    // The old diagnostic compared handle/0x1f7 with named/7 and reported ID
+    // differences. Check both variables on the same controlled fixture; never
+    // normalize ACE flags or assume that the two APIs have equivalent views.
+    final handle = read(path);
+    _expectPreserved(handle, read(path, named: true),
+        allowAi: false,
+        reason: 'GetSecurityInfo vs GetNamedSecurityInfoW, mask 0x1f7');
+    final basic = read(path, information: 7);
+    _expectPreserved(basic, read(path, named: true, information: 7),
+        allowAi: false,
+        reason: 'GetSecurityInfo vs GetNamedSecurityInfoW, mask 7');
+    expect(basic.owner, handle.owner);
+    expect(basic.group, handle.group);
+    expect(basic.dacl, handle.dacl);
+    expect(basic.control & 0x150c, handle.control & 0x150c,
+        reason: 'handle query masks 7 and 0x1f7 must preserve DACL controls');
+    _expectPreserved(handle, read(path),
+        allowAi: false,
+        reason: 'querying the named view must not mutate the raw policy');
+    return handle;
+  }
+
+  WindowsAccessPolicy read(String path,
+          {bool named = false, int information = 0x1f7}) =>
+      using((arena) {
+        final owner = arena<Pointer<Void>>();
+        final group = arena<Pointer<Void>>();
+        final dacl = arena<Pointer<Void>>();
         final descriptor = arena<Pointer<Void>>();
-        expect(
-            get(path.toNativeUtf16(allocator: arena), 1, 4, nullptr, nullptr,
-                nullptr, nullptr, descriptor),
-            0);
+        final name = path.toNativeUtf16(allocator: arena);
+        if (named) {
+          expect(
+              get(name, 1, information, owner, group, dacl, nullptr,
+                  descriptor),
+              0);
+        } else {
+          final handle = open(name, 0x20000, 7, nullptr, 3, 0x200000, nullptr);
+          expect(
+              handle.address, isNot(anyOf(-1, 0xffffffff, 0xffffffffffffffff)));
+          try {
+            expect(
+                getHandle(handle, 1, information, owner, group, dacl, nullptr,
+                    descriptor),
+                0);
+          } finally {
+            expect(close(handle), isNot(0));
+          }
+        }
         arena.onReleaseAll(() => free(descriptor.value));
+        final sacl = arena<Pointer<Void>>();
+        final present = arena<Int32>();
+        final defaulted = arena<Int32>();
         final value = arena<Uint16>();
         final revision = arena<Uint32>();
+        expect(getSacl(descriptor.value, present, sacl, defaulted), isNot(0));
         expect(control(descriptor.value, value, revision), isNot(0));
-        // Include present/defaulted, auto-inherit request, auto-inherited and
-        // protected bits, not just the subset represented by SDDL formatting.
-        return value.value & 0x150c;
+        List<int> sid(Pointer<Void> pointer) =>
+            List<int>.of(pointer.cast<Uint8>().asTypedList(sidLength(pointer)));
+        List<List<int>>? aces(Pointer<Void> acl) {
+          if (acl == nullptr) {
+            return null;
+          }
+          final entries = <List<int>>[];
+          final ace = arena<Pointer<Uint8>>();
+          for (var index = 0; index < acl.cast<Uint16>()[2]; index++) {
+            expect(getAce(acl, index, ace), isNot(0));
+            entries.add(List<int>.of(
+                ace.value.asTypedList(ace.value.cast<Uint16>()[1])));
+          }
+          return entries;
+        }
+
+        return WindowsAccessPolicy(
+            owner: sid(owner.value),
+            group: sid(group.value),
+            dacl: aces(dacl.value),
+            sacl: aces(sacl.value),
+            control: value.value);
       });
 
-  String snapshot(String path) => using((arena) {
+  String sddl(String path) => using((arena) {
         final descriptor = arena<Pointer<Void>>();
         expect(
             get(path.toNativeUtf16(allocator: arena), 1, 7, nullptr, nullptr,
@@ -373,16 +482,56 @@ final class _SecurityFixture {
         return text.value.toDartString();
       });
 
-  void setDacl(String path, String sddl) => using((arena) {
+  void setDacl(String path, String sddl, {bool protected = true}) =>
+      using((arena) {
+        final descriptor = arena<Pointer<Void>>();
+        expect(
+            parse(sddl.toNativeUtf16(allocator: arena), 1, descriptor, nullptr),
+            isNot(0));
+        arena.onReleaseAll(() => free(descriptor.value));
+        final acl = arena<Pointer<Void>>();
+        final present = arena<Int32>();
+        final defaulted = arena<Int32>();
+        expect(getDacl(descriptor.value, present, acl, defaulted), isNot(0));
+        expect(
+            setNamed(
+                path.toNativeUtf16(allocator: arena),
+                1,
+                4 | (protected ? 0x80000000 : 0x20000000),
+                nullptr,
+                nullptr,
+                acl.value,
+                nullptr),
+            0);
+      });
+
+  void setLegacyDacl(String path, String sddl, {required bool protected}) =>
+      using((arena) {
         final descriptor = arena<Pointer<Void>>();
         expect(
             parse(sddl.toNativeUtf16(allocator: arena), 1, descriptor, nullptr),
             isNot(0));
         arena.onReleaseAll(() => free(descriptor.value));
         expect(
-            set(path.toNativeUtf16(allocator: arena), 0x80000004,
-                descriptor.value),
+            setFile(path.toNativeUtf16(allocator: arena),
+                4 | (protected ? 0x80000000 : 0x20000000), descriptor.value),
             isNot(0));
+      });
+
+  void setLabel(String path, String sddl) => using((arena) {
+        final descriptor = arena<Pointer<Void>>();
+        expect(
+            parse(sddl.toNativeUtf16(allocator: arena), 1, descriptor, nullptr),
+            isNot(0));
+        arena.onReleaseAll(() => free(descriptor.value));
+        final acl = arena<Pointer<Void>>();
+        final present = arena<Int32>();
+        final defaulted = arena<Int32>();
+        expect(getSacl(descriptor.value, present, acl, defaulted), isNot(0));
+        expect(
+            setNamed(path.toNativeUtf16(allocator: arena), 1, 0x10, nullptr,
+                nullptr, nullptr, acl.value),
+            0);
       });
 
   void setAttributes(String path, int value) => using((arena) {
@@ -397,67 +546,4 @@ final class _SecurityFixture {
             handle.address, isNot(anyOf(-1, 0xffffffff, 0xffffffffffffffff)));
         return handle;
       });
-}
-
-String _hex(List<int> bytes) =>
-    bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
-
-String _diagnosticError(Object error) {
-  final text = error.toString();
-  return text.length <= 512 ? text : '${text.substring(0, 512)} [truncated]';
-}
-
-final class _PolicyDiagnostic {
-  _PolicyDiagnostic(
-      this.owner, this.group, this.dacl, this.sacl, this.control, this.sddl);
-
-  final String owner;
-  final String group;
-  final List<String>? dacl;
-  final List<String>? sacl;
-  final int control;
-  final String sddl;
-
-  void reportDifference(_PolicyDiagnostic after) {
-    String bounded(String text, int limit) => text.length <= limit
-        ? text
-        : '${text.substring(0, limit)} [truncated; ${text.length} chars]';
-    String aclText(List<String>? entries) => entries == null
-        ? 'null'
-        : entries
-            .asMap()
-            .entries
-            .map((entry) => '[${entry.key}] ${entry.value}')
-            .join('\n');
-    bool sameAcl(List<String>? left, List<String>? right) =>
-        (left == null) == (right == null) && aclText(left) == aclText(right);
-
-    // Compare full values before limiting output. At most one bounded report
-    // per fixture; preserve the save exception and recovery files unchanged.
-    print('Synthetic Windows policy differences: '
-        'owner=${owner != after.owner}, group=${group != after.group}, '
-        'DACL ACEs=${!sameAcl(dacl, after.dacl)}, '
-        'access SACL ACEs=${!sameAcl(sacl, after.sacl)}, '
-        'DACL control=${(control & 0x150c) != (after.control & 0x150c)}');
-    for (final bit in <int, String>{
-      0x0004: 'PRESENT',
-      0x0008: 'DEFAULTED',
-      0x0100: 'AUTO_INHERIT_REQ',
-      0x0400: 'AUTO_INHERITED',
-      0x1000: 'PROTECTED',
-    }.entries) {
-      print('DACL ${bit.value}: '
-          '${control & bit.key != 0} -> ${after.control & bit.key != 0}');
-    }
-    print('Owner SID bytes: ${bounded(owner, 256)} -> '
-        '${bounded(after.owner, 256)}');
-    print('Group SID bytes: ${bounded(group, 256)} -> '
-        '${bounded(after.group, 256)}');
-    print('DACL ACEs before:\n${bounded(aclText(dacl), 4096)}');
-    print('DACL ACEs after:\n${bounded(aclText(after.dacl), 4096)}');
-    print('Access SACL ACEs before:\n${bounded(aclText(sacl), 4096)}');
-    print('Access SACL ACEs after:\n${bounded(aclText(after.sacl), 4096)}');
-    print('SDDL before: ${bounded(sddl, 2048)}');
-    print('SDDL after: ${bounded(after.sddl, 2048)}');
-  }
 }

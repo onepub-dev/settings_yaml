@@ -7,12 +7,13 @@ import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
 import 'settings_yaml.dart';
+import 'windows_access_policy.dart';
 
 /// Native Windows save. Requires a trusted parent and no concurrent mutation.
 ///
 /// Access policy is preserved; auditing SACL entries are outside this contract.
-/// CAP, process-trust and access-filter policies fail before replacement.
-/// This adapter cannot reproduce their privilege semantics.
+/// Access-SACL policies and controls fail before replacement. This adapter
+/// cannot safely reproduce their inheritance and privilege semantics.
 void secureSaveWindows(String absolutePath, String content) {
   final api = _Windows();
   using((arena) {
@@ -28,6 +29,10 @@ void secureSaveWindows(String absolutePath, String content) {
     }
     final original =
         exists ? api.readAccessPolicy(target, arena, absolutePath) : null;
+    if (original != null && !original.supportedForReplacement) {
+      throw SettingsYamlException('Cannot safely preserve Windows access-SACL '
+          'policy; destination unchanged: $absolutePath');
+    }
 
     // OW is OWNER RIGHTS, not CREATOR OWNER. Neither this directory nor the
     // file ever inherits a permissive DACL, including during creation.
@@ -185,18 +190,6 @@ final class _SecurityAttributes extends Struct {
   external int inheritHandle;
 }
 
-final class _AccessPolicy {
-  _AccessPolicy(this.owner, this.group, this.dacl, this.sacl, this.control,
-      this.accessSaclFlags);
-
-  final Pointer<Void> owner;
-  final Pointer<Void> group;
-  final Pointer<Void> dacl;
-  final Pointer<Void> sacl;
-  final int control;
-  final int accessSaclFlags;
-}
-
 final class _Windows {
   _Windows() {
     // Resolve this symbol before any fallible call. A lazy GetProcAddress
@@ -286,9 +279,8 @@ final class _Windows {
           Pointer<Int32>),
       int Function(Pointer<Void>, Pointer<Int32>, Pointer<Pointer<Void>>,
           Pointer<Int32>)>('GetSecurityDescriptorDacl');
-  late final equalSid = security.lookupFunction<
-      Int32 Function(Pointer<Void>, Pointer<Void>),
-      int Function(Pointer<Void>, Pointer<Void>)>('EqualSid');
+  late final sidLength = security.lookupFunction<Uint32 Function(Pointer<Void>),
+      int Function(Pointer<Void>)>('GetLengthSid');
   late final getControl = security.lookupFunction<
       Int32 Function(Pointer<Void>, Pointer<Uint16>, Pointer<Uint32>),
       int Function(Pointer<Void>, Pointer<Uint16>,
@@ -375,62 +367,77 @@ final class _Windows {
     }
   }
 
-  _AccessPolicy readAccessPolicy(
+  WindowsAccessPolicy readAccessPolicy(
       Pointer<Utf16> path, Arena arena, String displayPath) {
     final source = createFile(path, 0x20000, 7, nullptr, 3, 0x200000, nullptr);
     if (invalid(source)) {
       fail('Open destination security', displayPath);
     }
     try {
-      final owner = arena<Pointer<Void>>();
-      final group = arena<Pointer<Void>>();
-      final dacl = arena<Pointer<Void>>();
-      final sd = arena<Pointer<Void>>();
-      // OWNER, GROUP, DACL, LABEL, ATTRIBUTE, SCOPE, PROCESS_TRUST_LABEL,
-      // ACCESS_FILTER. Query failure (including unsupported OS) is fail-closed.
-      final result =
-          getSecurity(source, 1, 0x1f7, owner, group, dacl, nullptr, sd);
-      if (result != 0) {
-        fail('Read destination access policy', displayPath, result);
-      }
-      arena.onReleaseAll(() => localFree(sd.value));
-      final sacl = arena<Pointer<Void>>();
-      final present = arena<Int32>();
-      final defaulted = arena<Int32>();
-      if (getSacl(sd.value, present, sacl, defaulted) == 0) {
-        fail('Inspect access policy', displayPath);
-      }
-      var accessSaclFlags = 0;
-      if (present.value != 0 && sacl.value != nullptr) {
-        final count = sacl.value.cast<Uint16>()[2];
-        final ace = arena<Pointer<Uint8>>();
-        for (var index = 0; index < count; index++) {
-          if (getAce(sacl.value, index, ace) == 0) {
-            fail('Inspect access policy entry', displayPath);
-          }
-          final type = ace.value.value;
-          // Only mandatory labels and resource attributes can be restored
-          // without changing privileged policy semantics. Unknown ACEs fail.
-          if (type != 0x11 && type != 0x12) {
-            throw SettingsYamlException('Cannot preserve Windows access policy '
-                'ACE type $type: $displayPath');
-          }
-          accessSaclFlags |= type == 0x11 ? 0x10 : 0x20;
-        }
-      }
-      final control = arena<Uint16>();
-      final revision = arena<Uint32>();
-      if (getControl(sd.value, control, revision) == 0) {
-        fail('Read security descriptor control', displayPath);
-      }
-      return _AccessPolicy(owner.value, group.value, dacl.value, sacl.value,
-          control.value, accessSaclFlags);
+      return readHandlePolicy(source, arena, displayPath);
     } finally {
       close(source);
     }
   }
 
-  void prepareAccessPolicy(_AccessPolicy original, Pointer<Void> stage,
+  WindowsAccessPolicy readHandlePolicy(
+      Pointer<Void> source, Arena arena, String displayPath) {
+    final owner = arena<Pointer<Void>>();
+    final group = arena<Pointer<Void>>();
+    final dacl = arena<Pointer<Void>>();
+    final sd = arena<Pointer<Void>>();
+    // OWNER, GROUP, DACL, LABEL, ATTRIBUTE, SCOPE, PROCESS_TRUST_LABEL,
+    // ACCESS_FILTER. Query failure (including unsupported OS) is fail-closed.
+    final result =
+        getSecurity(source, 1, 0x1f7, owner, group, dacl, nullptr, sd);
+    if (result != 0) {
+      fail('Read destination access policy', displayPath, result);
+    }
+    arena.onReleaseAll(() => localFree(sd.value));
+    final sacl = arena<Pointer<Void>>();
+    final present = arena<Int32>();
+    final defaulted = arena<Int32>();
+    if (getSacl(sd.value, present, sacl, defaulted) == 0) {
+      fail('Inspect access policy', displayPath);
+    }
+    final control = arena<Uint16>();
+    final revision = arena<Uint32>();
+    if (getControl(sd.value, control, revision) == 0) {
+      fail('Read security descriptor control', displayPath);
+    }
+    List<int> sid(Pointer<Void> value) {
+      if (value == nullptr) {
+        throw SettingsYamlException('Missing Windows security identity: '
+            '$displayPath');
+      }
+      return List<int>.of(value.cast<Uint8>().asTypedList(sidLength(value)));
+    }
+
+    List<List<int>>? acl(Pointer<Void> value) {
+      if (value == nullptr) {
+        return null;
+      }
+      final entries = <List<int>>[];
+      final ace = arena<Pointer<Uint8>>();
+      for (var index = 0; index < value.cast<Uint16>()[2]; index++) {
+        if (getAce(value, index, ace) == 0) {
+          fail('Inspect access policy entry', displayPath);
+        }
+        entries.add(
+            List<int>.of(ace.value.asTypedList(ace.value.cast<Uint16>()[1])));
+      }
+      return entries;
+    }
+
+    return WindowsAccessPolicy(
+        owner: sid(owner.value),
+        group: sid(group.value),
+        dacl: acl(dacl.value),
+        sacl: acl(sacl.value),
+        control: control.value);
+  }
+
+  void prepareAccessPolicy(WindowsAccessPolicy original, Pointer<Void> stage,
       Pointer<Void> privateDescriptor, Arena arena, String path) {
     // ReplaceFileW preserves the original DACL itself. Applying it here would
     // recompute inheritance against the private staging parent and discard ID
@@ -439,54 +446,16 @@ final class _Windows {
     // grant another principal access to secret staging bytes or prevent us
     // reopening the file for ReplaceFileW. Fail closed for differing identities
     // rather than changing them or enabling privileges.
-    final owner = arena<Pointer<Void>>();
-    final group = arena<Pointer<Void>>();
-    final sd = arena<Pointer<Void>>();
-    final checked =
-        getSecurity(stage, 1, 0x1f7, owner, group, nullptr, nullptr, sd);
-    if (checked != 0) {
-      fail('Verify staging access policy', path, checked);
-    }
-    arena.onReleaseAll(() => localFree(sd.value));
-    final sacl = arena<Pointer<Void>>();
+    final prepared = readHandlePolicy(stage, arena, path);
     final present = arena<Int32>();
     final defaulted = arena<Int32>();
-    if (getSacl(sd.value, present, sacl, defaulted) == 0) {
-      fail('Verify staging access labels', path);
-    }
-    if (equalSid(original.owner, owner.value) == 0 ||
-        equalSid(original.group, group.value) == 0) {
+    if (!original.sameIdentities(prepared)) {
       throw SettingsYamlException('Cannot safely reproduce the existing '
           'owner or group; destination unchanged: $path');
     }
-    // Do not assume an owner/group-only SetSecurityInfo call leaves DACL
-    // control intact. Avoid rewriting identities or labels that already match.
-    if (!sameAcl(original.sacl, sacl.value)) {
-      if (original.accessSaclFlags == 0) {
-        throw SettingsYamlException('Cannot safely reproduce the existing '
-            'access labels; destination unchanged: $path');
-      }
-      final applied = setSecurity(stage, 1, original.accessSaclFlags, nullptr,
-          nullptr, nullptr, original.sacl);
-      if (applied != 0) {
-        fail('Preserve destination access labels', path, applied);
-      }
-      final checkedSd = arena<Pointer<Void>>();
-      final checked = getSecurity(
-          stage, 1, 0x1f7, owner, group, nullptr, nullptr, checkedSd);
-      if (checked != 0) {
-        fail('Verify prepared staging access policy', path, checked);
-      }
-      arena.onReleaseAll(() => localFree(checkedSd.value));
-      if (getSacl(checkedSd.value, present, sacl, defaulted) == 0) {
-        fail('Verify prepared staging access labels', path);
-      }
-      if (equalSid(original.owner, owner.value) == 0 ||
-          equalSid(original.group, group.value) == 0 ||
-          !sameAcl(original.sacl, sacl.value)) {
-        throw SettingsYamlException('Windows did not reproduce the existing '
-            'owner, group or access labels; destination unchanged: $path');
-      }
+    if (!original.sameAccessSacl(prepared)) {
+      throw SettingsYamlException('Cannot safely reproduce the existing '
+          'access-SACL policy; destination unchanged: $path');
     }
     // Align protection explicitly: ReplaceFileW promises the original DACL,
     // but does not promise to copy every descriptor control bit. An unprotected
@@ -519,21 +488,20 @@ final class _Windows {
       if (applied != 0) {
         fail('Prepare staging DACL protection', path, applied);
       }
+      final checked = readHandlePolicy(stage, arena, path);
+      if (!original.sameIdentities(checked) ||
+          !original.sameAccessSacl(checked)) {
+        throw SettingsYamlException('Cannot safely prepare Windows access '
+            'policy; destination unchanged: $path');
+      }
     }
   }
 
   void verifyAccessPolicy(
-      _AccessPolicy original, _AccessPolicy actual, String path) {
-    // Include DACL present/defaulted, auto-inherit request, auto-inherited and
-    // protected bits. The ACE comparison includes order and inheritance flags.
-    const daclControl = 0x150c;
-    if (equalSid(original.owner, actual.owner) == 0 ||
-        equalSid(original.group, actual.group) == 0 ||
-        !sameAcl(original.dacl, actual.dacl) ||
-        !sameAcl(original.sacl, actual.sacl) ||
-        (original.control & daclControl) != (actual.control & daclControl)) {
+      WindowsAccessPolicy original, WindowsAccessPolicy actual, String path) {
+    if (!original.preservedBy(actual)) {
       throw SettingsYamlException('Windows did not preserve the existing '
-          'access policy exactly: $path');
+          'access policy: $path');
     }
   }
 }

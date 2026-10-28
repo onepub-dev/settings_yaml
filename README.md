@@ -106,17 +106,34 @@ destination. The original remains in place on pre-replacement failure. There is
 no copy fallback or deliberate removal of the destination before rename.
 
 On Windows, `CreateDirectoryW` and `CreateFileW` receive an explicit protected
-owner-only DACL at creation; the DACL is checked before writing settings. Existing
-owner, group, DACL, mandatory labels and resource attributes are applied and checked
-before replacement. Files with central access policies, process-trust or access-filter
-ACEs are rejected before replacement, as are metadata reads or updates denied by
-the OS. Audit-only SACL entries are outside the preservation contract. Existing
-encrypted files use encrypted staging. Replacement uses `ReplaceFileW` without
-ACL-ignore flags and with a unique recovery backup inside the staging directory.
-On a replacement error, the exception reports destination and recovery paths;
-the original may already have moved, so all recovery artifacts are retained.
-Inspect those paths before manual recovery. New files use a same-volume move that
-does not overwrite an unexpectedly existing destination.
+owner-only DACL at creation; the DACL is checked before writing settings. The stage
+keeps its private DACL until replacement. Existing owner and group must match the
+stage; differing identities fail before replacement. Access-SACL policies, including
+mandatory labels, resource attributes, central access policies, process-trust and
+access-filter ACEs, are currently unsupported and rejected before replacement.
+Even an empty present access SACL or access-SACL inheritance/protection controls
+are rejected: this adapter cannot safely reproduce their semantics without further
+validation. Metadata reads or updates denied by the OS also fail. Audit-only SACL
+entries are outside the preservation contract. Existing encrypted files use
+encrypted staging.
+
+Replacement uses `ReplaceFileW` without ACL-ignore flags, preserving the existing
+DACL through replacement, with a unique recovery backup inside the staging
+directory. After commitment, the adapter verifies owner, group, ordered DACL ACE
+bytes (including inheritance flags), access-SACL ACEs and relevant descriptor
+controls. The only permitted control change is DACL `AUTO_INHERITED` from false to
+true; true to false is rejected. This records participation in Windows automatic
+inheritance and does not change DACL protection. Unprotected files remain subject
+to later inheritable parent grants and denials. This exception does not promise
+identical historical descriptor bits or behavior under every legacy inheritance
+operation.
+
+On a replacement error or post-commit verification failure, the exception reports
+destination and recovery paths and all recovery artifacts are retained. The
+original may already have moved; a verification failure is not a rollback and
+cannot guarantee that the old policy remains active. Inspect those paths before
+manual recovery. New files use a same-volume move that does not overwrite an
+unexpectedly existing destination.
 
 Existing `.bak` files are untouched. On POSIX, atomic replacement keeps the old
 file available until commit, replacing the former move-to-`.bak` recovery scheme.
