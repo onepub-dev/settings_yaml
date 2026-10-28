@@ -20,9 +20,35 @@ void main() {
     });
     tearDown(() => temporary.deleteSync(recursive: true));
 
+    test(
+        'first native save creates missing file and preserves unrelated backup',
+        () {
+      // Keep this before fixture calls: lazy GetLastError resolution used to
+      // erase ERROR_FILE_NOT_FOUND on the first GetFileAttributesW failure.
+      File('$path.bak').writeAsStringSync('unrelated');
+      secureSaveWindows(path, 'secret');
+      expect(File(path).readAsStringSync(), 'secret');
+      expect(native.snapshot(path), contains('D:P(A;;FA;;;OW)'));
+      expect(File('$path.bak').readAsStringSync(), 'unrelated');
+      expect(temporary.listSync().map((entry) => p.basename(entry.path)),
+          unorderedEquals(['settings.yaml', 'settings.yaml.bak']));
+    });
+
+    test('missing parent reports the native path error', () {
+      final missing = p.join(temporary.path, 'missing', 'settings.yaml');
+      expect(
+          () => secureSaveWindows(missing, 'secret'),
+          throwsA(isA<SettingsYamlException>().having(
+              (error) => error.toString(),
+              'native error',
+              contains('Inspect destination failed (Windows 3)'))));
+      expect(temporary.listSync(), isEmpty);
+    });
+
     test('preserves owner, group and ordinary inherited DACL', () {
       File(path).writeAsStringSync('old');
       final before = native.snapshot(path);
+      expect(before, contains(';ID;'));
       secureSaveWindows(path, 'new');
       expect(File(path).readAsStringSync(), 'new');
       expect(native.snapshot(path), before);

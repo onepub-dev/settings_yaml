@@ -18,13 +18,16 @@ void secureSaveWindows(String absolutePath, String content) {
   using((arena) {
     final target = absolutePath.toNativeUtf16(allocator: arena);
     final attributes = api.attributes(target);
+    final attributeError = api.lastError();
     final exists = attributes != 0xffffffff;
-    if (!exists && api.lastError() != 2) {
-      api.fail('Inspect destination', absolutePath);
+    if (!exists && attributeError != 2) {
+      api.fail('Inspect destination', absolutePath, attributeError);
     }
     if (exists && attributes & (0x400 | 0x10) != 0) {
       throw SettingsYamlException('Save destination must be a regular file.');
     }
+    final original =
+        exists ? api.readAccessPolicy(target, arena, absolutePath) : null;
 
     // OW is OWNER RIGHTS, not CREATOR OWNER. Neither this directory nor the
     // file ever inherits a permissive DACL, including during creation.
@@ -114,8 +117,10 @@ void secureSaveWindows(String absolutePath, String content) {
         if (api.flush(handle) == 0) {
           api.fail('Flush staging file', stage);
         }
-        if (exists) {
-          api.copyAccessPolicy(target, handle, arena, absolutePath);
+        if (original != null) {
+          api
+            ..prepareAccessPolicy(original, handle, arena, absolutePath)
+            ..verifyPrivate(handle, descriptor.value, arena, stage);
         }
         // ReplaceFile opens the replacement without sharing; close first.
         if (api.close(handle) == 0) {
@@ -140,6 +145,17 @@ void secureSaveWindows(String absolutePath, String content) {
               'The destination may have moved. Recovery artifacts retained: '
               'original="$backup", replacement="$stage", '
               'destination="$absolutePath".');
+        }
+        // Replacement is already committed. Never remove the recovery copy
+        // or claim rollback if the filesystem did not preserve the policy.
+        try {
+          final actual = api.readAccessPolicy(target, arena, absolutePath);
+          api.verifyAccessPolicy(original!, actual, absolutePath);
+        } catch (error) {
+          retainRecovery = true;
+          throw SettingsYamlException('Replacement committed, but access '
+              'policy verification failed: $error. Recovery artifacts '
+              'retained: original="$backup", destination="$absolutePath".');
         }
       } else if (api.move(
               target: target, source: stage.toNativeUtf16(allocator: arena)) ==
@@ -167,7 +183,25 @@ final class _SecurityAttributes extends Struct {
   external int inheritHandle;
 }
 
+final class _AccessPolicy {
+  _AccessPolicy(this.owner, this.group, this.dacl, this.sacl, this.control,
+      this.accessSaclFlags);
+
+  final Pointer<Void> owner;
+  final Pointer<Void> group;
+  final Pointer<Void> dacl;
+  final Pointer<Void> sacl;
+  final int control;
+  final int accessSaclFlags;
+}
+
 final class _Windows {
+  _Windows() {
+    // Resolve this symbol before any fallible call. A lazy GetProcAddress
+    // lookup after a failure can overwrite the thread's native last error.
+    lastError();
+  }
+
   final kernel = DynamicLibrary.open('kernel32.dll');
   final security = DynamicLibrary.open('advapi32.dll');
 
@@ -324,14 +358,20 @@ final class _Windows {
     if (getDacl(expected, present, expectedDacl, defaulted) == 0) {
       fail('Read private staging ACL', path);
     }
-    if (!sameAcl(expectedDacl.value, actualDacl.value)) {
+    final control = arena<Uint16>();
+    final revision = arena<Uint32>();
+    if (getControl(sd.value, control, revision) == 0) {
+      fail('Read private staging security control', path);
+    }
+    if (!sameAcl(expectedDacl.value, actualDacl.value) ||
+        control.value & 0x1000 == 0) {
       throw SettingsYamlException('Filesystem did not apply private staging '
-          'ACL; no content written: $path');
+          'ACL: $path');
     }
   }
 
-  void copyAccessPolicy(Pointer<Utf16> path, Pointer<Void> stage, Arena arena,
-      String displayPath) {
+  _AccessPolicy readAccessPolicy(
+      Pointer<Utf16> path, Arena arena, String displayPath) {
     final source = createFile(path, 0x20000, 7, nullptr, 3, 0x200000, nullptr);
     if (invalid(source)) {
       fail('Open destination security', displayPath);
@@ -368,7 +408,7 @@ final class _Windows {
           // without changing privileged policy semantics. Unknown ACEs fail.
           if (type != 0x11 && type != 0x12) {
             throw SettingsYamlException('Cannot preserve Windows access policy '
-                'ACE type $type; destination unchanged: $displayPath');
+                'ACE type $type: $displayPath');
           }
           accessSaclFlags |= type == 0x11 ? 0x10 : 0x20;
         }
@@ -378,38 +418,61 @@ final class _Windows {
       if (getControl(sd.value, control, revision) == 0) {
         fail('Read security descriptor control', displayPath);
       }
-      final protection = control.value & 0x1000 != 0 ? 0x80000000 : 0x20000000;
-      final applied = setSecurity(stage, 1, 7 | accessSaclFlags | protection,
-          owner.value, group.value, dacl.value, sacl.value);
-      if (applied != 0) {
-        fail('Preserve destination access policy', displayPath, applied);
-      }
-      final newOwner = arena<Pointer<Void>>();
-      final newGroup = arena<Pointer<Void>>();
-      final newDacl = arena<Pointer<Void>>();
-      final newSd = arena<Pointer<Void>>();
-      final checked = getSecurity(
-          stage, 1, 0x1f7, newOwner, newGroup, newDacl, nullptr, newSd);
-      if (checked != 0) {
-        fail('Verify preserved access policy', displayPath, checked);
-      }
-      arena.onReleaseAll(() => localFree(newSd.value));
-      final newSacl = arena<Pointer<Void>>();
-      final newControl = arena<Uint16>();
-      if (getSacl(newSd.value, present, newSacl, defaulted) == 0 ||
-          getControl(newSd.value, newControl, revision) == 0) {
-        fail('Verify security descriptor', displayPath);
-      }
-      if (equalSid(owner.value, newOwner.value) == 0 ||
-          equalSid(group.value, newGroup.value) == 0 ||
-          !sameAcl(dacl.value, newDacl.value) ||
-          !sameAcl(sacl.value, newSacl.value) ||
-          (control.value & 0x1000) != (newControl.value & 0x1000)) {
-        throw SettingsYamlException('Windows did not reproduce the existing '
-            'access policy exactly; destination unchanged: $displayPath');
-      }
+      return _AccessPolicy(owner.value, group.value, dacl.value, sacl.value,
+          control.value, accessSaclFlags);
     } finally {
       close(source);
+    }
+  }
+
+  void prepareAccessPolicy(
+      _AccessPolicy original, Pointer<Void> stage, Arena arena, String path) {
+    // ReplaceFileW preserves the original DACL itself. Applying it here would
+    // recompute inheritance against the private staging parent and discard ID
+    // flags or add AI. Keep the private creation DACL until replacement.
+    // Owner/group and mandatory labels are not promised by ReplaceFileW, so
+    // prepare these while the file is still inside the private directory.
+    final applied = setSecurity(stage, 1, 3 | original.accessSaclFlags,
+        original.owner, original.group, nullptr, original.sacl);
+    if (applied != 0) {
+      fail(
+          'Preserve destination owner, group and access labels', path, applied);
+    }
+    final owner = arena<Pointer<Void>>();
+    final group = arena<Pointer<Void>>();
+    final sd = arena<Pointer<Void>>();
+    final checked =
+        getSecurity(stage, 1, 0x1f7, owner, group, nullptr, nullptr, sd);
+    if (checked != 0) {
+      fail('Verify staging access policy', path, checked);
+    }
+    arena.onReleaseAll(() => localFree(sd.value));
+    final sacl = arena<Pointer<Void>>();
+    final present = arena<Int32>();
+    final defaulted = arena<Int32>();
+    if (getSacl(sd.value, present, sacl, defaulted) == 0) {
+      fail('Verify staging access labels', path);
+    }
+    if (equalSid(original.owner, owner.value) == 0 ||
+        equalSid(original.group, group.value) == 0 ||
+        !sameAcl(original.sacl, sacl.value)) {
+      throw SettingsYamlException('Windows did not reproduce the existing '
+          'owner, group or access labels; destination unchanged: $path');
+    }
+  }
+
+  void verifyAccessPolicy(
+      _AccessPolicy original, _AccessPolicy actual, String path) {
+    // Include DACL present/defaulted, auto-inherit request, auto-inherited and
+    // protected bits. The ACE comparison includes order and inheritance flags.
+    const daclControl = 0x150c;
+    if (equalSid(original.owner, actual.owner) == 0 ||
+        equalSid(original.group, actual.group) == 0 ||
+        !sameAcl(original.dacl, actual.dacl) ||
+        !sameAcl(original.sacl, actual.sacl) ||
+        (original.control & daclControl) != (actual.control & daclControl)) {
+      throw SettingsYamlException('Windows did not preserve the existing '
+          'access policy exactly: $path');
     }
   }
 }
