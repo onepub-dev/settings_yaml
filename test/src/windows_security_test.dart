@@ -52,6 +52,8 @@ void main() {
         native.configure(temporary.path, path, kind);
         File('$path.bak').writeAsStringSync('unrelated');
         final before = native.queryMatrix(path);
+        expect(before.sacl, isNull,
+            reason: 'ordinary files have no queried access SACL');
         expect(before.control & 0x1000, kind == 'protected' ? 0x1000 : 0);
         expect(_hasInherited(before), kind == 'inherited');
         for (final content in ['new', 'updated']) {
@@ -264,7 +266,10 @@ void _expectPreserved(WindowsAccessPolicy before, WindowsAccessPolicy after,
   expect(after.group, before.group, reason: reason);
   expect(after.dacl, before.dacl, reason: reason);
   expect(after.sacl, before.sacl, reason: reason);
-  expect(after.control & 0x3b3c, before.control & 0x3b3c, reason: reason);
+  expect(after.control & 0x110c, before.control & 0x110c, reason: reason);
+  if (before.sacl != null || after.sacl != null) {
+    expect(after.control & 0x2a30, before.control & 0x2a30, reason: reason);
+  }
   if (!allowAi || before.control & 0x400 != 0) {
     expect(after.control & 0x400, before.control & 0x400, reason: reason);
   }

@@ -21,17 +21,22 @@ final class WindowsAccessPolicy {
   static const daclControl = 0x110c;
 
   /// ReplaceFileW does not promise to preserve all access-SACL semantics.
-  /// Reject even an empty, present ACL until its controls can be reproduced
-  /// without privileges. In particular, do not try to rewrite mandatory labels.
-  bool get supportedForReplacement =>
-      sacl == null && control & saclControl == 0;
+  /// Reject even an empty non-null ACL. A null access SACL can still carry
+  /// descriptor-wide SACL controls from policy outside the queried subset;
+  /// those bits alone do not establish an access-SACL policy.
+  /// In particular, do not try to rewrite mandatory labels.
+  bool get supportedForReplacement => sacl == null;
 
   bool sameIdentities(WindowsAccessPolicy other) =>
       _sameBytes(owner, other.owner) && _sameBytes(group, other.group);
 
-  bool sameAccessSacl(WindowsAccessPolicy other) =>
-      _sameAcl(sacl, other.sacl) &&
-      control & saclControl == other.control & saclControl;
+  bool sameAccessSacl(WindowsAccessPolicy other) {
+    if (sacl == null || other.sacl == null) {
+      return sacl == other.sacl;
+    }
+    return _sameAcl(sacl, other.sacl) &&
+        control & saclControl == other.control & saclControl;
+  }
 
   /// Accept only equal DACL AI or its observed false-to-true normalization.
   /// AI is not protection: unprotected files remain subject to parent changes.

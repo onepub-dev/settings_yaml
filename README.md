@@ -111,18 +111,22 @@ keeps its private DACL until replacement. Existing owner and group must match th
 stage; differing identities fail before replacement. Access-SACL policies, including
 mandatory labels, resource attributes, central access policies, process-trust and
 access-filter ACEs, are currently unsupported and rejected before replacement.
-Even an empty present access SACL or access-SACL inheritance/protection controls
-are rejected: this adapter cannot safely reproduce their semantics without further
-validation. Metadata reads or updates denied by the OS also fail. Audit-only SACL
-entries are outside the preservation contract. Existing encrypted files use
+Even an empty non-null access SACL is rejected: this adapter cannot safely
+reproduce its semantics without further validation. When the queried access SACL
+is null, descriptor-wide SACL control bits alone do not block saving; they can
+describe policy outside the queried access subset. Metadata reads or updates
+denied by the OS also fail. Audit-only SACL entries are outside the preservation
+contract. Existing encrypted files use
 encrypted staging.
 
 Replacement uses `ReplaceFileW` without ACL-ignore flags, preserving the existing
 DACL through replacement, with a unique recovery backup inside the staging
 directory. After commitment, the adapter verifies owner, group, ordered DACL ACE
-bytes (including inheritance flags), access-SACL ACEs and relevant descriptor
-controls. The only permitted control change is DACL `AUTO_INHERITED` from false to
-true; true to false is rejected. This records participation in Windows automatic
+bytes (including inheritance flags), relevant DACL controls, and that the access
+SACL remains null. SACL control differences are ignored when both queried access SACLs
+are null; introduction of any non-null access SACL fails verification. The only
+permitted DACL control change is `AUTO_INHERITED` from false to true; true to false
+is rejected. This records participation in Windows automatic
 inheritance and does not change DACL protection. Unprotected files remain subject
 to later inheritable parent grants and denials. This exception does not promise
 identical historical descriptor bits or behavior under every legacy inheritance

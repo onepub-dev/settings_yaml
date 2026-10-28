@@ -12,7 +12,7 @@ import 'windows_access_policy.dart';
 /// Native Windows save. Requires a trusted parent and no concurrent mutation.
 ///
 /// Access policy is preserved; auditing SACL entries are outside this contract.
-/// Access-SACL policies and controls fail before replacement. This adapter
+/// Non-null access SACLs fail before replacement. This adapter
 /// cannot safely reproduce their inheritance and privilege semantics.
 void secureSaveWindows(String absolutePath, String content) {
   final api = _Windows();

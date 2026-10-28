@@ -22,9 +22,8 @@ void main() {
     expect(policy(control: 0x404).preservedBy(policy()), isFalse);
   });
 
-  test('all other access-relevant controls remain strict in both directions',
-      () {
-    for (final bit in [4, 8, 0x100, 0x1000, 0x10, 0x20, 0x200, 0x800, 0x2000]) {
+  test('all other DACL controls remain strict in both directions', () {
+    for (final bit in [4, 8, 0x100, 0x1000]) {
       final changed = policy(control: 4 ^ bit);
       expect(policy().preservedBy(changed), isFalse, reason: 'bit $bit');
       expect(changed.preservedBy(policy()), isFalse, reason: 'bit $bit');
@@ -79,10 +78,54 @@ void main() {
         isFalse);
   });
 
-  test('unsupported access SACLs and their controls reject before replacement',
+  test('null access SACL ignores descriptor-wide SACL controls', () {
+    for (final bits in [0, 0x10, 0x20, 0x200, 0x800, 0x2000, 0x2a30]) {
+      final original = policy(control: 4 | bits);
+      expect(original.supportedForReplacement, isTrue, reason: 'bits $bits');
+      expect(original.sameAccessSacl(policy()), isTrue, reason: 'bits $bits');
+      expect(original.preservedBy(policy()), isTrue, reason: 'bits $bits');
+      expect(policy().preservedBy(original), isTrue, reason: 'bits $bits');
+    }
+  });
+
+  test('non-null access SACLs reject before replacement and on introduction',
       () {
-    expect(policy().supportedForReplacement, isTrue);
-    expect(policy(sacl: []).supportedForReplacement, isFalse);
+    // SYSTEM_MANDATORY_LABEL_ACE: no-write-up, S-1-16-8192 (medium).
+    const mandatoryLabel = [
+      0x11,
+      0,
+      20,
+      0,
+      1,
+      0,
+      0,
+      0,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      16,
+      0,
+      32,
+      0,
+      0
+    ];
+    for (final sacl in <List<List<int>>>[
+      [],
+      [mandatoryLabel]
+    ]) {
+      for (final bits in [0, 0x10, 0x2a30]) {
+        final changed = policy(sacl: sacl, control: 4 | bits);
+        expect(changed.supportedForReplacement, isFalse);
+        final original = policy(control: 4 | bits);
+        expect(original.sameAccessSacl(changed), isFalse);
+        expect(original.preservedBy(changed), isFalse);
+        expect(changed.preservedBy(original), isFalse);
+      }
+    }
     for (final type in [0x11, 0x12, 0x13, 0x14, 0x15, 0xff]) {
       expect(
           policy(sacl: [
@@ -90,8 +133,15 @@ void main() {
           ]).supportedForReplacement,
           isFalse);
     }
+  });
+
+  test('non-null access SACL comparison retains strict control checks', () {
     for (final bit in [0x10, 0x20, 0x200, 0x800, 0x2000]) {
-      expect(policy(control: 4 | bit).supportedForReplacement, isFalse);
+      final original = policy(sacl: []);
+      final changed = policy(sacl: [], control: 4 | bit);
+      expect(original.sameAccessSacl(changed), isFalse);
+      expect(original.preservedBy(changed), isFalse);
+      expect(changed.preservedBy(original), isFalse);
     }
   });
 }
