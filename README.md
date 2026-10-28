@@ -78,8 +78,9 @@ untrusted documents must separately limit input size and execution resources.
 
 ## Filesystem security and recovery
 
-Save adapters are implemented for Linux, macOS and Windows. Native macOS and
-Windows validation is still outstanding: this working patch is not release-ready.
+Save adapters are implemented for Linux, macOS and Windows. Their native test
+suites and analyzers passed on all three platforms; a Dart 3.0.7 consumer also
+resolved and analyzed the package.
 Other operating systems reject saves; reading does not require a save adapter.
 
 Saving requires a trusted parent directory and trusted ancestor path components.
@@ -154,10 +155,10 @@ fresh destination open fails; an unavailable or unverifiable backup is reported.
 New files use a same-volume move that does not overwrite an
 unexpectedly existing destination.
 
-The sibling-stage approach remains unproven on native Windows. Release requires
-native inherited and mixed explicit/inherited ACL tests, parent grants and
-revocations, actual access checks with a nonowner token, and failure/recovery
-validation. Linux tests cannot establish these Windows guarantees. Policies that
+Native Windows tests cover inherited and mixed explicit/inherited ACLs,
+protected and legacy policies, repeated saves, parent grants and revocations,
+prewrite rejection, and recovery checks. Tests with a separate nonowner token
+and injected write, flush or replacement failures have not been run. Policies that
 deny the rights required to reopen or replace a file can fail even when ordinary
 in-place writing would be allowed; there is no in-place fallback.
 
